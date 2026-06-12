@@ -95,6 +95,10 @@ export class StubOrchestrator implements Orchestrator {
     // no-op for the stub
   }
 
+  isActive(): boolean {
+    return false;
+  }
+
   async markCompleted(sessionId: string): Promise<void> {
     await setSessionStatus(sessionId, 'completed');
     bus.emit({

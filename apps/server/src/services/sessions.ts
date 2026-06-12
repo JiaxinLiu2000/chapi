@@ -20,6 +20,7 @@ import {
   toSessionDTO,
 } from '../mappers.js';
 import { settings } from '../secrets.js';
+import { getOrchestrator } from '../orchestrator/types.js';
 import { deriveTitle, makeSessionSlug } from '../util/ids.js';
 
 const log = createLogger('sessions');
@@ -98,6 +99,7 @@ export async function getSessionDetail(
 ): Promise<SessionDetailResponse | null> {
   const session = await prisma.session.findUnique({ where: { id } });
   if (!session) return null;
+  await reconcileAgents(id);
   const [messages, plan, agents, artifacts, attachments, openQuestions] =
     await Promise.all([
       prisma.message.findMany({ where: { sessionId: id }, orderBy: { createdAt: 'asc' } }),
@@ -116,6 +118,29 @@ export async function getSessionDetail(
     attachments: attachments.map(toAttachmentDTO),
     openQuestions: openQuestions.map(toPendingQuestionDTO),
   };
+}
+
+/**
+ * Clean up an agent list before display: collapse duplicate "main" rows (left by
+ * earlier runs/restarts) into one, and — when no run is active — mark agents stuck
+ * in "running" (from a killed process) as interrupted.
+ */
+async function reconcileAgents(sessionId: string): Promise<void> {
+  const mains = await prisma.agentRun.findMany({
+    where: { sessionId, name: 'main' },
+    orderBy: { createdAt: 'asc' },
+  });
+  if (mains.length > 1) {
+    const keep = mains[mains.length - 1];
+    const dropIds = mains.filter((m) => m.id !== keep?.id).map((m) => m.id);
+    if (dropIds.length) await prisma.agentRun.deleteMany({ where: { id: { in: dropIds } } });
+  }
+  if (!getOrchestrator().isActive(sessionId)) {
+    await prisma.agentRun.updateMany({
+      where: { sessionId, status: 'running' },
+      data: { status: 'interrupted', currentTool: null, currentActivity: null },
+    });
+  }
 }
 
 export async function deleteSession(id: string): Promise<void> {

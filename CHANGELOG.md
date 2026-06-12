@@ -4,6 +4,16 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.14
+
+- Fix duplicate "主代理" rows when opening a history conversation. Each run used to create a
+  new `main` AgentRun row, and rows left `running` by a killed process were never closed —
+  so history piled up multiple main agents (one with stale raw-JSON activity).
+  - `ensureMainAgent` now reuses one `main` row across runs, drops duplicates, and closes
+    agents stuck `running` from a previous process.
+  - Loading a session reconciles agents: collapses duplicate `main` rows into one and, when no
+    run is active, marks stale `running` agents as interrupted. Verified 2 → 1.
+
 ## v0.1.13
 
 - Settings polish: "Google 已连接" now shows as a green badge (when connected); errors show in red.

@@ -37,6 +37,40 @@ export class RunMonitor {
   constructor(private readonly sessionId: string) {}
 
   async ensureMainAgent(title?: string): Promise<string> {
+    const cached = this.agents.get('main');
+    if (cached) return cached;
+
+    // Agents left "running" by a previous (possibly killed) run are stale — close them.
+    await prisma.agentRun.updateMany({
+      where: { sessionId: this.sessionId, status: 'running' },
+      data: { status: 'interrupted', currentTool: null, currentActivity: null },
+    });
+
+    // Reuse ONE main row across runs/restarts (avoid duplicate "主代理"); drop extras.
+    const mains = await prisma.agentRun.findMany({
+      where: { sessionId: this.sessionId, name: 'main' },
+      orderBy: { createdAt: 'asc' },
+    });
+    const keep = mains[mains.length - 1];
+    if (keep) {
+      const dropIds = mains.filter((m) => m.id !== keep.id).map((m) => m.id);
+      if (dropIds.length) await prisma.agentRun.deleteMany({ where: { id: { in: dropIds } } });
+      const updated = await prisma.agentRun.update({
+        where: { id: keep.id },
+        data: {
+          status: 'running',
+          currentTool: null,
+          currentActivity: null,
+          title: title ?? keep.title,
+          startedAt: keep.startedAt ?? new Date(),
+        },
+      });
+      this.agents.set('main', updated.id);
+      this.agentStart.set(updated.id, updated.startedAt?.getTime() ?? Date.now());
+      bus.emit({ type: 'agent.status', sessionId: this.sessionId, agent: toAgentRunDTO(updated) });
+      return updated.id;
+    }
+
     return this.ensureAgent('main', 'main', title);
   }
 

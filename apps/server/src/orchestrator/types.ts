@@ -34,6 +34,9 @@ export interface Orchestrator {
 
   /** Switch the session's model (live) and/or effort (next turn). */
   setConfig(sessionId: string, model?: string, effort?: string): Promise<void>;
+
+  /** True if a run is currently active for this session. */
+  isActive(sessionId: string): boolean;
 }
 
 let active: Orchestrator | null = null;

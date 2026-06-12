@@ -122,6 +122,10 @@ export class SdkOrchestrator implements Orchestrator {
     this.runs.delete(sessionId);
   }
 
+  isActive(sessionId: string): boolean {
+    return this.runs.has(sessionId);
+  }
+
   async setConfig(sessionId: string, model?: string, effort?: string): Promise<void> {
     const data: { model?: string; effort?: string } = {};
     if (model) data.model = model;
