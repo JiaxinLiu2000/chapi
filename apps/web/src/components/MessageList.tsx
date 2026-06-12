@@ -43,9 +43,11 @@ export function MessageList({
       {messages.length === 0 && !streaming && (
         <div className="py-12 text-center text-sm text-muted">开始你的任务吧。</div>
       )}
-      {messages.map((m) => (
-        <Bubble key={m.id} role={m.role} text={m.text} />
-      ))}
+      {messages
+        .filter((m) => m.text.trim().length > 0)
+        .map((m) => (
+          <Bubble key={m.id} role={m.role} text={m.text} />
+        ))}
       {streaming && <Bubble role="assistant" text={streaming} streaming />}
       {running && !streaming && (
         <div className="flex items-center gap-2 text-xs text-muted">

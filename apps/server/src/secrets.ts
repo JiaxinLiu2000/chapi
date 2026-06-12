@@ -15,6 +15,7 @@ const KEY_MAIN_MODEL = 'main_model';
 const KEY_SUBAGENT_MODEL = 'subagent_model';
 const KEY_EMBEDDING_MODEL = 'embedding_model';
 const KEY_CANVA_ENABLED = 'canva_enabled';
+const KEY_MAX_SUBAGENTS = 'max_subagents';
 
 const SECRET_KEYS = new Set([KEY_OPENAI, KEY_ANTHROPIC, KEY_GOOGLE_ID, KEY_GOOGLE_SECRET]);
 
@@ -113,6 +114,12 @@ class SettingsStore {
     return (await this.readRaw(KEY_CANVA_ENABLED)) === 'true';
   }
 
+  async getMaxSubagents(): Promise<number> {
+    const raw = await this.readRaw(KEY_MAX_SUBAGENTS);
+    const n = raw ? Number.parseInt(raw, 10) : config.maxSubagents;
+    return Number.isFinite(n) ? Math.min(8, Math.max(1, n)) : config.maxSubagents;
+  }
+
   async getPublic(): Promise<PublicSettingsDTO> {
     const models = await this.getModels();
     const google = await this.getGoogleOAuth();
@@ -125,6 +132,7 @@ class SettingsStore {
       hasGoogleOAuth: Boolean(google.clientId && google.clientSecret),
       googleUserEmail: (await this.getGoogleUserEmail()) ?? '',
       canvaEnabled: await this.getCanvaEnabled(),
+      maxSubagents: await this.getMaxSubagents(),
     };
   }
 
@@ -141,6 +149,10 @@ class SettingsStore {
       [
         KEY_CANVA_ENABLED,
         input.canvaEnabled === undefined ? undefined : String(input.canvaEnabled),
+      ],
+      [
+        KEY_MAX_SUBAGENTS,
+        input.maxSubagents === undefined ? undefined : String(input.maxSubagents),
       ],
     ];
     for (const [key, value] of entries) {

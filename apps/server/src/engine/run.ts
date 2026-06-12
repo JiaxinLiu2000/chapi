@@ -84,6 +84,7 @@ export class Run {
     if (!session) throw new Error(`session ${this.sessionId} not found`);
 
     const anthropicKey = await settings.getAnthropicKey();
+    const maxSubagents = await settings.getMaxSubagents();
     const canUseTool = buildCanUseTool(
       session.id,
       session.permissionProfile as PermissionProfile,
@@ -97,8 +98,23 @@ export class Run {
       hooks,
       anthropicKey,
       mcpServers: { chapi: chapiServer, ...external },
-      allowedTools: CHAPI_TOOL_NAMES,
+      // Pre-approve our own tools + safe built-ins so they don't go through the
+      // permission path. Writes (Write/Edit/Bash) and any external MCP tools fall
+      // through to canUseTool, which enforces the sandbox + Gmail-send restrictions.
+      allowedTools: [
+        ...CHAPI_TOOL_NAMES,
+        'Read',
+        'Grep',
+        'Glob',
+        'LS',
+        'TodoWrite',
+        'Task',
+        'WebSearch',
+        'WebFetch',
+        'NotebookRead',
+      ],
       extraSystemContext: summary,
+      maxSubagents,
       abortController: this.abort,
     });
 

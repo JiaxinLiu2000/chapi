@@ -12,7 +12,7 @@ const log = createLogger('mcp-registry');
  *
  *   CHAPI_ENABLE_CONTEXT7=1   docs lookup (npx @upstash/context7-mcp)
  *   CHAPI_ENABLE_BROWSER=1    cloakbrowser via Playwright MCP over CDP
- *   CHAPI_ENABLE_GOOGLE=1     google_workspace_mcp (needs OAuth client in Settings)
+ *   Google Workspace         auto-enabled when OAuth client id+secret are set in Settings
  *   Settings.canvaEnabled     Canva remote MCP
  */
 export async function buildExternalMcpServers(): Promise<Record<string, McpServerConfig>> {
@@ -35,7 +35,10 @@ export async function buildExternalMcpServers(): Promise<Record<string, McpServe
     };
   }
 
-  if (process.env.CHAPI_ENABLE_GOOGLE === '1') {
+  // Google Workspace: enabled whenever OAuth credentials are configured (Settings
+  // or env). No separate enable flag — configuring credentials IS the opt-in.
+  // First Google tool call triggers the browser OAuth consent flow.
+  {
     const google = await settings.getGoogleOAuth();
     if (google.clientId && google.clientSecret) {
       const userEmail = await settings.getGoogleUserEmail();
@@ -49,8 +52,6 @@ export async function buildExternalMcpServers(): Promise<Record<string, McpServe
           ...(userEmail ? { USER_GOOGLE_EMAIL: userEmail } : {}),
         },
       };
-    } else {
-      log.warn('CHAPI_ENABLE_GOOGLE set but Google OAuth client not configured in Settings');
     }
   }
 

@@ -41,7 +41,7 @@ export function buildCanUseTool(
     }
 
     if (profile === 'vscode') {
-      return { behavior: 'allow' };
+      return { behavior: 'allow', updatedInput: input };
     }
 
     // web profile: restrict file-writing tools to the session's private dirs.
@@ -63,7 +63,7 @@ export function buildCanUseTool(
       }
     }
 
-    return { behavior: 'allow' };
+    return { behavior: 'allow', updatedInput: input };
   };
 }
 

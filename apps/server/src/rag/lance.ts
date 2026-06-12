@@ -59,14 +59,21 @@ export interface LanceHit {
 export async function lanceSearch(vector: number[], k: number): Promise<LanceHit[]> {
   const conn = await db();
   if (!(await hasTable(conn))) return [];
-  const table = await conn.openTable(TABLE);
-  const results = (await table.search(vector).limit(k).toArray()) as Array<
-    Record<string, unknown>
-  >;
-  return results.map((r) => ({
-    entryId: String(r.entryId ?? ''),
-    chunk: String(r.chunk ?? ''),
-    sourceRef: String(r.sourceRef ?? 'null'),
-    distance: typeof r._distance === 'number' ? r._distance : 0,
-  }));
+  try {
+    const table = await conn.openTable(TABLE);
+    const results = (await table.search(vector).limit(k).toArray()) as Array<
+      Record<string, unknown>
+    >;
+    return results.map((r) => ({
+      entryId: String(r.entryId ?? ''),
+      chunk: String(r.chunk ?? ''),
+      sourceRef: String(r.sourceRef ?? 'null'),
+      distance: typeof r._distance === 'number' ? r._distance : 0,
+    }));
+  } catch (err) {
+    // e.g. embedding-dimension mismatch with an older table — degrade to empty
+    // rather than crashing the agent's wiki_search.
+    log.warn('lance search failed; returning no hits', err);
+    return [];
+  }
 }

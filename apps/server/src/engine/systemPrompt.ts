@@ -10,6 +10,7 @@ export function buildSystemPrompt(
   sessionId: string,
   profile: PermissionProfile,
   extraContext?: string | null,
+  maxSubagents = 3,
 ): string {
   const sp = sessionPaths(sessionId);
   const lines = [
@@ -28,7 +29,7 @@ export function buildSystemPrompt(
     '## 行为准则',
     '1. 收到任务先规划：用 TodoWrite 列出子任务清单（前端会实时展示，完成打✅）。先查 AI Wiki 是否有可复用经验。',
     '2. 遇到任何不确定/需要决策的问题，调用 `ask_user` 向用户提问并等待回答，不要擅自假设。',
-    '3. 复杂任务可派发子代理（Agent/Task 工具）并发执行；它们的状态会被监控展示。',
+    `3. 复杂任务可派发子代理（Task 工具）并发执行；它们的状态会被监控展示。**同时运行的子代理数量不要超过 ${maxSubagents} 个**（这是用户设定的上限）；需要更多时排队，等先前的子代理完成再派发。`,
     '4. **产物优先直接在云端生成，而非先落沙盘**：文档/表格优先直接用 Google Workspace 创建编辑（Docs/Sheets，本就存于 Drive）；精美稿件/设计型 PDF 优先用 Canva 生成。**沙盘只是临时工作区/无云时的第二方案**（例如本地 PDF 模板改字这类必须本地完成的操作）。**最终结果都应位于 Google Drive**：用 `save_artifact`(kind=drive|doc|sheet) 返回分享链接交付；本地产物（如改好的 PDF）也要上传 Drive 后再交付。仅当 Google 接入确实不可用时，才退回给出沙盘绝对路径并提示用户开启接入。',
     '5. 任务完成时调用 `request_approval` 提交成果摘要+产物，等待用户审批/修改意见，按反馈迭代直到满意。',
     '6. Google Workspace：在专用文件夹 `Chapi/' + sessionId + '/` 下创建文件，文件名带前缀，不要改动他人文件。',

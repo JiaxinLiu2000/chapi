@@ -18,6 +18,7 @@ export interface BuildOptionsDeps {
   mcpServers?: Options['mcpServers'];
   allowedTools?: string[];
   extraSystemContext?: string | null;
+  maxSubagents?: number;
   abortController: AbortController;
 }
 
@@ -43,7 +44,7 @@ export function buildRunOptions(session: Session, deps: BuildOptionsDeps): Optio
     systemPrompt: {
       type: 'preset',
       preset: 'claude_code',
-      append: buildSystemPrompt(session.id, profile, deps.extraSystemContext),
+      append: buildSystemPrompt(session.id, profile, deps.extraSystemContext, deps.maxSubagents),
     },
     canUseTool: deps.canUseTool,
     hooks: deps.hooks,

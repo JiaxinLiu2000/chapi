@@ -4,6 +4,22 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.7
+
+- Fix: Google Workspace now **auto-enables when OAuth credentials are set in Settings** —
+  no separate `CHAPI_ENABLE_GOOGLE` env flag needed. This is why no OAuth consent popup
+  appeared and the agent had no Google tools. The first Google tool call triggers consent.
+- Fix: web tools failing ("harness-level permission error"). `allowedTools` was narrowed to
+  only the 7 in-process tools, forcing WebSearch/WebFetch/Task/etc. through the permission
+  path. Now built-in safe tools (Read/Grep/Glob/TodoWrite/Task/WebSearch/WebFetch) are
+  pre-approved; writes + external MCP tools still go through canUseTool. **Verified live:**
+  WebFetch on example.com returns "Example Domain".
+- Add **max parallel sub-agents** setting (1–8, default 3), enforced via the system prompt
+  and surfaced in Settings.
+- UI: stop rendering empty message bubbles (tool-only/empty assistant turns).
+- Resilience: vector search degrades to empty on a dimension mismatch instead of throwing.
+- canUseTool now returns `updatedInput` on allow (correct SDK contract).
+
 ## v0.1.6
 
 - Fix "Failed to fetch" when sending a message: CORS now reflects any origin (the server

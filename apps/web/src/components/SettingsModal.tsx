@@ -55,6 +55,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
         subagentModel: s.subagentModel,
         embeddingModel: s.embeddingModel,
         googleUserEmail: s.googleUserEmail,
+        maxSubagents: s.maxSubagents,
       });
   }, [s]);
 
@@ -158,13 +159,28 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
             </select>
           </Field>
         </div>
-        <Field label="嵌入模型 (OpenAI)">
-          <input
-            className={inputCls}
-            value={form.embeddingModel ?? ''}
-            onChange={(e) => set('embeddingModel', e.target.value)}
-          />
-        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="嵌入模型 (OpenAI)">
+            <input
+              className={inputCls}
+              value={form.embeddingModel ?? ''}
+              onChange={(e) => set('embeddingModel', e.target.value)}
+            />
+          </Field>
+          <Field label="最多并行子代理" hint="主代理同时运行的 sub-agent 上限">
+            <select
+              className={inputCls}
+              value={form.maxSubagents ?? 3}
+              onChange={(e) => setForm((f) => ({ ...f, maxSubagents: Number(e.target.value) }))}
+            >
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
 
         <div className="flex items-center justify-between border-t border-border pt-3">
           <Button variant="ghost" onClick={requestNotif} className="text-xs">
