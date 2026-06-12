@@ -4,6 +4,12 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.18
+
+- Launcher now **pre-warms the dev routes** (`/`, `/wiki`, `/s/[slug]`) in the background right
+  after startup, so the first time you open a conversation it's already compiled (no ~14s wait).
+  Verified: post-warm session-page requests respond in ~1.4s instead of ~14s.
+
 ## v0.1.17
 
 - Add **隐藏浏览器窗口** toggle: runs cloakbrowser **headless** (no taskbar window) while it stays

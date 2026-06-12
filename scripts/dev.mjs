@@ -114,6 +114,33 @@ async function main() {
     '\n\x1b[32m✅ Chapi is starting →\x1b[0m  web http://localhost:3100   |   server http://localhost:8123',
   );
   console.log('   Press Ctrl+C to stop everything (frontend + backend + database).\n');
+
+  // Pre-compile the dev routes in the background so the first real visit is fast
+  // (Next.js dev compiles routes on demand — /s/[slug] is ~1300 modules).
+  void warmup();
+}
+
+async function warmup() {
+  const base = 'http://127.0.0.1:3100';
+  for (let i = 0; i < 90; i++) {
+    try {
+      const r = await fetch(base + '/', { signal: AbortSignal.timeout(3000) });
+      if (r.status < 500) break;
+    } catch {
+      /* not up yet */
+    }
+    await sleep(1000);
+  }
+  // Hitting each route once triggers its on-demand compile (the dynamic /s route
+  // compiles once for all slugs).
+  for (const p of ['/', '/wiki', '/s/_warmup']) {
+    try {
+      await fetch(base + p, { signal: AbortSignal.timeout(60000) });
+    } catch {
+      /* ignore */
+    }
+  }
+  tag('web', '路由已预热，首次打开会话将更快');
 }
 
 main().catch((err) => {
