@@ -9,13 +9,21 @@ import type {
   WikiSearchResponse,
   WikiEntryDTO,
 } from '@chapi/shared';
-import { API_BASE } from './config';
+import { API_BASE, SERVER_URL } from './config';
+
+const OFFLINE_MSG = `无法连接后端 ${SERVER_URL} — 请确认后端已启动（在项目根目录运行 pnpm start）。`;
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
+    });
+  } catch {
+    // fetch throws a TypeError ("Failed to fetch") when the server is unreachable
+    throw new Error(OFFLINE_MSG);
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
@@ -58,10 +66,15 @@ export const api = {
   async upload(sessionId: string, files: File[]): Promise<UploadResponse> {
     const form = new FormData();
     for (const f of files) form.append('files', f, f.name);
-    const res = await fetch(`${API_BASE}/sessions/${sessionId}/upload`, {
-      method: 'POST',
-      body: form,
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE}/sessions/${sessionId}/upload`, {
+        method: 'POST',
+        body: form,
+      });
+    } catch {
+      throw new Error(OFFLINE_MSG);
+    }
     if (!res.ok) throw new Error(`upload failed: HTTP ${res.status}`);
     return res.json() as Promise<UploadResponse>;
   },

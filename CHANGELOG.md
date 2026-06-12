@@ -4,6 +4,15 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.6
+
+- Fix "Failed to fetch" when sending a message: CORS now reflects any origin (the server
+  binds to loopback, so this is safe locally), fixing the case where the web is opened via a
+  LAN URL (e.g. http://192.168.x.x:3100) or a non-default port. Verified the API returns 201
+  with `access-control-allow-origin` echoing a LAN origin.
+- The web now shows an actionable error ("无法连接后端 … 请确认后端已启动 pnpm start") instead of a
+  bare "Failed to fetch" when the backend is unreachable.
+
 ## v0.1.5
 
 - Fix: stale production `.next` cache (from `next build`) crashed `next dev` with
