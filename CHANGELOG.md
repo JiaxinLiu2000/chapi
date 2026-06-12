@@ -4,6 +4,13 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.12
+
+- Fix "Bad Request" on the **连接 Google（开始授权）** and **打开浏览器登录账号并保存** buttons:
+  these are bodyless POSTs sent with `content-type: application/json`, which Fastify rejected
+  (`FST_ERR_CTP_EMPTY_JSON_BODY`). The server now tolerates an empty JSON body (parses to `{}`).
+  Verified both endpoints return 200; `/google/connect` reports connected when access works.
+
 ## v0.1.11
 
 - Fix a console hydration warning caused by browser extensions injecting attributes onto
