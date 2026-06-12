@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Chat } from '@/components/Chat';
 import { MonitorCard } from '@/components/MonitorCard';
+import { BrowserPanel } from '@/components/BrowserPanel';
 import { useSessionSocket } from '@/hooks/useSessionSocket';
 import { useStore } from '@/lib/store';
 import { getSocket } from '@/lib/ws';
@@ -49,6 +50,7 @@ export default function SessionPage() {
     <div className="flex">
       <MonitorCard />
       <Chat sessionId={data.session.id} />
+      <BrowserPanel sessionId={data.session.id} />
     </div>
   );
 }

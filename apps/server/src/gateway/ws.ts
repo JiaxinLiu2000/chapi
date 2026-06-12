@@ -8,6 +8,7 @@ import {
 } from '@chapi/shared';
 import { createLogger } from '../logger.js';
 import { getOrchestrator } from '../orchestrator/types.js';
+import { browserView } from '../engine/browserView.js';
 import { bus, isGlobalEvent } from './bus.js';
 
 const log = createLogger('ws');
@@ -26,6 +27,7 @@ export function attachWebSocket(server: HttpServer): WebSocketServer {
 
   wss.on('connection', (socket: WebSocket) => {
     const subscribed = new Set<string>();
+    const viewing = new Set<string>(); // sessions whose browser screencast this socket watches
     log.debug('client connected');
 
     const send = (event: ServerEvent) => {
@@ -93,6 +95,15 @@ export function attachWebSocket(server: HttpServer): WebSocketServer {
           case 'set.config':
             await getOrchestrator().setConfig(cmd.sessionId, cmd.model, cmd.effort);
             return;
+          case 'browser.view':
+            if (cmd.on) {
+              viewing.add(cmd.sessionId);
+              await browserView.addViewer(cmd.sessionId);
+            } else {
+              viewing.delete(cmd.sessionId);
+              browserView.removeViewer(cmd.sessionId);
+            }
+            return;
         }
       } catch (err) {
         log.error(`command ${cmd.type} failed`, err);
@@ -107,6 +118,8 @@ export function attachWebSocket(server: HttpServer): WebSocketServer {
 
     socket.on('close', () => {
       off();
+      for (const sid of viewing) browserView.removeViewer(sid);
+      viewing.clear();
       log.debug('client disconnected');
     });
     socket.on('error', (err) => log.warn('socket error', err));

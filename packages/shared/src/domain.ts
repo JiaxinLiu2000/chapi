@@ -231,5 +231,6 @@ export interface PublicSettingsDTO {
   hasGoogleOAuth: boolean;
   googleUserEmail: string;
   canvaEnabled: boolean;
+  enableBrowser: boolean;
   maxSubagents: number;
 }

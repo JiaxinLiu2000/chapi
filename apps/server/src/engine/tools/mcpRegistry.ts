@@ -22,7 +22,7 @@ export async function buildExternalMcpServers(): Promise<Record<string, McpServe
     servers.context7 = { type: 'stdio', command: 'npx', args: ['-y', '@upstash/context7-mcp'] };
   }
 
-  if (process.env.CHAPI_ENABLE_BROWSER === '1') {
+  if (await settings.getBrowserEnabled()) {
     servers.browser = {
       type: 'stdio',
       command: 'npx',

@@ -41,9 +41,17 @@ interface ChapiState {
   approvals: ApprovalRequestDTO[];
   toast: ToastNotification | null;
 
+  // live cloakbrowser view
+  browserFrame: string | null; // base64 jpeg
+  browserUrl: string | null;
+  browserStatus: 'idle' | 'connecting' | 'connected' | 'disconnected' | 'unavailable';
+  browserMessage: string | null;
+  browserViewOn: boolean;
+
   setSessions: (s: SessionDTO[]) => void;
   loadDetail: (d: SessionDetailResponse) => void;
   resetActive: () => void;
+  setBrowserViewOn: (on: boolean) => void;
   clearToast: () => void;
   addOptimisticUser: (text: string) => void;
   applyEvent: (e: ServerEvent) => void;
@@ -72,8 +80,14 @@ export const useStore = create<ChapiState>((set, get) => ({
   questions: [],
   approvals: [],
   toast: null,
+  browserFrame: null,
+  browserUrl: null,
+  browserStatus: 'idle',
+  browserMessage: null,
+  browserViewOn: false,
 
   setSessions: (s) => set({ sessions: s }),
+  setBrowserViewOn: (on) => set({ browserViewOn: on }),
 
   loadDetail: (d) =>
     set({
@@ -89,6 +103,11 @@ export const useStore = create<ChapiState>((set, get) => ({
       approvals: [],
       runState: 'idle',
       toolCalls: [],
+      browserFrame: null,
+      browserUrl: null,
+      browserStatus: 'idle',
+      browserMessage: null,
+      browserViewOn: false,
     }),
 
   resetActive: () =>
@@ -105,6 +124,11 @@ export const useStore = create<ChapiState>((set, get) => ({
       runState: 'idle',
       questions: [],
       approvals: [],
+      browserFrame: null,
+      browserUrl: null,
+      browserStatus: 'idle',
+      browserMessage: null,
+      browserViewOn: false,
     }),
 
   clearToast: () => set({ toast: null }),
@@ -213,6 +237,18 @@ export const useStore = create<ChapiState>((set, get) => ({
       case 'notification':
         if (forActive(e.sessionId))
           set({ toast: { level: e.level, title: e.title, body: e.body, ts: Date.now() } });
+        break;
+      case 'browser.frame':
+        if (forActive(e.sessionId))
+          set((s) => ({ browserFrame: e.dataBase64, browserUrl: e.url ?? s.browserUrl }));
+        break;
+      case 'browser.state':
+        if (forActive(e.sessionId))
+          set((s) => ({
+            browserStatus: e.status,
+            browserUrl: e.url ?? s.browserUrl,
+            browserMessage: e.message ?? null,
+          }));
         break;
       case 'error':
         if (forActive(e.sessionId))

@@ -57,6 +57,7 @@ export const updateSettingsSchema = z.object({
   subagentModel: z.string().optional(),
   embeddingModel: z.string().optional(),
   canvaEnabled: z.boolean().optional(),
+  enableBrowser: z.boolean().optional(),
   maxSubagents: z.number().int().min(1).max(8).optional(),
 });
 export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>;
@@ -92,6 +93,19 @@ export interface UploadResponse {
 export interface GoogleConnectResponse {
   status: 'connected' | 'authorizing' | 'error';
   authUrl?: string;
+  message: string;
+}
+
+export interface BrowserLoginResponse {
+  status: 'launched' | 'error';
+  message: string;
+}
+
+export interface BrowserStatusResponse {
+  installed: boolean;
+  serving: boolean; // cloakserve CDP reachable
+  enabled: boolean; // enableBrowser setting
+  profileDir: string;
   message: string;
 }
 

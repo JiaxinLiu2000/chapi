@@ -56,10 +56,27 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
         embeddingModel: s.embeddingModel,
         googleUserEmail: s.googleUserEmail,
         maxSubagents: s.maxSubagents,
+        enableBrowser: s.enableBrowser,
       });
   }, [s]);
 
   const set = (k: keyof UpdateSettingsInput, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  const [bBusy, setBBusy] = useState(false);
+  const [bMsg, setBMsg] = useState('');
+  const browserLogin = async () => {
+    setBBusy(true);
+    setBMsg('正在打开浏览器…（首次启用需下载内核，可能要等一会）');
+    try {
+      await api.updateSettings(form);
+      const r = await api.browserLogin();
+      setBMsg(r.message);
+    } catch (e) {
+      setBMsg(e instanceof Error ? e.message : '打开失败');
+    } finally {
+      setBBusy(false);
+    }
+  };
 
   const [gBusy, setGBusy] = useState(false);
   const [gMsg, setGMsg] = useState('');
@@ -209,6 +226,27 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
               ))}
             </select>
           </Field>
+        </div>
+
+        <div className="space-y-2 border-t border-border pt-3">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={Boolean(form.enableBrowser)}
+              onChange={(e) => setForm((f) => ({ ...f, enableBrowser: e.target.checked }))}
+            />
+            启用 cloakbrowser（浏览器自动化）
+            <span className="text-[11px] text-muted/60">· 启用后重启生效，首次会自动下载内核</span>
+          </label>
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" className="text-xs" disabled={bBusy} onClick={browserLogin}>
+              {bBusy ? '打开中…' : '打开浏览器登录账号并保存'}
+            </Button>
+            {bMsg && <span className="text-[11px] text-muted">{bMsg}</span>}
+          </div>
+          <p className="text-[11px] text-muted/60">
+            登录态保存在持久化 profile，agent 调用 cloakbrowser 时自动复用，可访问需登录的网站。
+          </p>
         </div>
 
         <div className="flex items-center justify-between border-t border-border pt-3">

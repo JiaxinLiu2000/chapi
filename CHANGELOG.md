@@ -4,6 +4,19 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.9
+
+- **cloakbrowser integration (auto-managed)**: new "启用 cloakbrowser" setting; the platform
+  auto-installs cloakbrowser via `uv` and runs `cloakserve` (persistent profile) on start.
+- **Live browser view (left/right split)**: a "🌐 实时浏览器" toggle streams the agent's
+  cloakbrowser screen into the session UI via CDP screencast (`browser.frame`/`browser.state`
+  events). Verified the WS plumbing (connecting → connected/unavailable) end-to-end.
+- **Login & save**: Settings button "打开浏览器登录账号并保存" launches a headful cloakbrowser
+  with the persistent profile so you can sign into account-gated sites once; logins persist and
+  are reused by the agent.
+- Browser MCP (Playwright over CDP) now enabled by the setting instead of an env flag.
+- `GET /api/browser/status`, `POST /api/browser/login` endpoints.
+
 ## v0.1.8
 
 - Settings: add a **连接 Google（开始授权）** button that proactively starts Google Workspace

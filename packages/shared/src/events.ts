@@ -67,6 +67,20 @@ export type ServerEvent =
       title: string;
       body: string;
     }
+  | {
+      // Live cloakbrowser screencast frame (base64 JPEG) projected into the UI.
+      type: 'browser.frame';
+      sessionId: string;
+      dataBase64: string;
+      url: string | null;
+    }
+  | {
+      type: 'browser.state';
+      sessionId: string;
+      status: 'connecting' | 'connected' | 'disconnected' | 'unavailable';
+      url: string | null;
+      message?: string;
+    }
   | { type: 'error'; sessionId: string | null; message: string };
 
 export type ServerEventType = ServerEvent['type'];
@@ -97,6 +111,11 @@ export const clientCommandSchema = z.discriminatedUnion('type', [
     feedback: z.string().optional(),
   }),
   z.object({ type: z.literal('mark.completed'), sessionId: z.string().min(1) }),
+  z.object({
+    type: z.literal('browser.view'),
+    sessionId: z.string().min(1),
+    on: z.boolean(),
+  }),
   z.object({
     type: z.literal('set.config'),
     sessionId: z.string().min(1),

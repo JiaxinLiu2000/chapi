@@ -32,6 +32,14 @@ export function RunConfigBar({ sessionId }: { sessionId: string }) {
     getSocket().send({ type: 'set.config', sessionId, effort: value });
   };
 
+  const browserOn = useStore((s) => s.browserViewOn);
+  const setBrowserOn = useStore((s) => s.setBrowserViewOn);
+  const toggleBrowser = () => {
+    const next = !browserOn;
+    setBrowserOn(next);
+    getSocket().send({ type: 'browser.view', sessionId, on: next });
+  };
+
   // Always include the current model in the dropdown, even if it's a custom id.
   const models = MODEL_OPTIONS.some((m) => m.id === model)
     ? MODEL_OPTIONS
@@ -69,9 +77,18 @@ export function RunConfigBar({ sessionId }: { sessionId: string }) {
         ))}
       </select>
 
-      <span className="ml-auto text-[11px] text-muted/60">
-        {completed ? '已完成（只读）' : '可随时切换'}
-      </span>
+      <button
+        className={
+          'ml-auto rounded-md border px-2 py-1 text-xs ' +
+          (browserOn
+            ? 'border-accent/40 bg-accent/15 text-text'
+            : 'border-border text-muted hover:text-text')
+        }
+        onClick={toggleBrowser}
+        title="在右侧实时显示 agent 的浏览器画面"
+      >
+        🌐 实时浏览器
+      </button>
     </div>
   );
 }

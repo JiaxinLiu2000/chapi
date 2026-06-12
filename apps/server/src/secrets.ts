@@ -15,6 +15,7 @@ const KEY_MAIN_MODEL = 'main_model';
 const KEY_SUBAGENT_MODEL = 'subagent_model';
 const KEY_EMBEDDING_MODEL = 'embedding_model';
 const KEY_CANVA_ENABLED = 'canva_enabled';
+const KEY_BROWSER_ENABLED = 'browser_enabled';
 const KEY_MAX_SUBAGENTS = 'max_subagents';
 
 const SECRET_KEYS = new Set([KEY_OPENAI, KEY_ANTHROPIC, KEY_GOOGLE_ID, KEY_GOOGLE_SECRET]);
@@ -114,6 +115,12 @@ class SettingsStore {
     return (await this.readRaw(KEY_CANVA_ENABLED)) === 'true';
   }
 
+  async getBrowserEnabled(): Promise<boolean> {
+    const raw = await this.readRaw(KEY_BROWSER_ENABLED);
+    if (raw === null) return process.env.CHAPI_ENABLE_BROWSER === '1';
+    return raw === 'true';
+  }
+
   async getMaxSubagents(): Promise<number> {
     const raw = await this.readRaw(KEY_MAX_SUBAGENTS);
     const n = raw ? Number.parseInt(raw, 10) : config.maxSubagents;
@@ -132,6 +139,7 @@ class SettingsStore {
       hasGoogleOAuth: Boolean(google.clientId && google.clientSecret),
       googleUserEmail: (await this.getGoogleUserEmail()) ?? '',
       canvaEnabled: await this.getCanvaEnabled(),
+      enableBrowser: await this.getBrowserEnabled(),
       maxSubagents: await this.getMaxSubagents(),
     };
   }
@@ -149,6 +157,10 @@ class SettingsStore {
       [
         KEY_CANVA_ENABLED,
         input.canvaEnabled === undefined ? undefined : String(input.canvaEnabled),
+      ],
+      [
+        KEY_BROWSER_ENABLED,
+        input.enableBrowser === undefined ? undefined : String(input.enableBrowser),
       ],
       [
         KEY_MAX_SUBAGENTS,
