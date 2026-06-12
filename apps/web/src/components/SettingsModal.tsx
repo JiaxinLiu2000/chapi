@@ -9,15 +9,24 @@ import { Modal } from './ui/Modal';
 function Field({
   label,
   hint,
+  saved,
   children,
 }: {
   label: string;
   hint?: string;
+  saved?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <label className="block">
-      <div className="mb-1 text-xs font-medium text-muted">{label}</div>
+      <div className="mb-1 flex items-center gap-2">
+        <span className="text-xs font-medium text-muted">{label}</span>
+        {saved && (
+          <span className="rounded-full bg-[#22c55e]/15 px-2 py-0.5 text-[10px] font-medium text-[#4ade80] ring-1 ring-inset ring-[#22c55e]/40">
+            已保存
+          </span>
+        )}
+      </div>
       {children}
       {hint && <div className="mt-1 text-[11px] text-muted/70">{hint}</div>}
     </label>
@@ -65,7 +74,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
     try {
       await api.updateSettings(form);
       await refetch();
-      setForm((f) => ({ ...f, openAiKey: '', googleOAuthClientSecret: '' }));
+      setForm((f) => ({ ...f, openAiKey: '', googleOAuthClientId: '', googleOAuthClientSecret: '' }));
       setMsg('已保存');
     } catch (e) {
       setMsg(e instanceof Error ? e.message : '保存失败');
@@ -84,25 +93,26 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
         <p className="text-xs text-muted/70">
           Claude 用本机 Claude Code 凭证运行，无需 Anthropic API Key。
         </p>
-        <Field label="OpenAI API Key" hint={s?.hasOpenAiKey ? '已配置（留空保持不变）' : 'RAG 嵌入用'}>
+        <Field label="OpenAI API Key" saved={s?.hasOpenAiKey} hint={s?.hasOpenAiKey ? undefined : 'RAG 嵌入用'}>
           <input
             className={inputCls}
             type="password"
-            placeholder={s?.hasOpenAiKey ? '••••••••（已保存）' : 'sk-…'}
+            placeholder={s?.hasOpenAiKey ? '••••••••' : 'sk-…'}
             value={form.openAiKey ?? ''}
             onChange={(e) => set('openAiKey', e.target.value)}
           />
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Google OAuth Client ID">
+          <Field label="Google OAuth Client ID" saved={s?.hasGoogleOAuth}>
             <input
               className={inputCls}
+              type="password"
               value={form.googleOAuthClientId ?? ''}
-              placeholder={s?.hasGoogleOAuth ? '已保存' : ''}
+              placeholder={s?.hasGoogleOAuth ? '••••••••' : ''}
               onChange={(e) => set('googleOAuthClientId', e.target.value)}
             />
           </Field>
-          <Field label="Google OAuth Client Secret">
+          <Field label="Google OAuth Client Secret" saved={s?.hasGoogleOAuth}>
             <input
               className={inputCls}
               type="password"

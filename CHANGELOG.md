@@ -4,6 +4,12 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.4
+
+- Settings: saved secret fields (OpenAI key, Google OAuth Client ID & Secret) now show a
+  green **已保存** badge next to the label and the input shows only dots (masked), instead of
+  text placeholders. Client ID is masked like the Secret.
+
 ## v0.1.3
 
 - Settings: add a **Google account email** field (passed as `USER_GOOGLE_EMAIL` to the
