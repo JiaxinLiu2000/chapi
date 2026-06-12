@@ -4,6 +4,12 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.13
+
+- Settings polish: "Google 已连接" now shows as a green badge (when connected); errors show in red.
+- Added an `outline` Button variant with a visible border; the **连接 Google（开始授权）**,
+  **打开浏览器登录账号并保存**, and **开启桌面通知** buttons now clearly look like buttons.
+
 ## v0.1.12
 
 - Fix "Bad Request" on the **连接 Google（开始授权）** and **打开浏览器登录账号并保存** buttons:

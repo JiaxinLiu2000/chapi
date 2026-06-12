@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MODEL_OPTIONS, type UpdateSettingsInput } from '@chapi/shared';
 import { api } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import { Button } from './ui/Button';
 import { Modal } from './ui/Modal';
 
@@ -80,13 +81,16 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 
   const [gBusy, setGBusy] = useState(false);
   const [gMsg, setGMsg] = useState('');
+  const [gStatus, setGStatus] = useState<'idle' | 'connected' | 'authorizing' | 'error'>('idle');
   const connectGoogle = async () => {
     setGBusy(true);
+    setGStatus('idle');
     setGMsg('正在启动 Google 授权…（首次可能需下载 workspace-mcp，请稍候）');
     try {
       // Save any edited OAuth credentials first so the connect probe uses them.
       await api.updateSettings(form);
       const r = await api.connectGoogle();
+      setGStatus(r.status);
       if (r.status === 'authorizing' && r.authUrl) {
         window.open(r.authUrl, '_blank', 'noopener,noreferrer');
         setGMsg(r.message + '（已在新标签打开授权页）');
@@ -95,6 +99,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
       }
       await refetch();
     } catch (e) {
+      setGStatus('error');
       setGMsg(e instanceof Error ? e.message : '连接失败');
     } finally {
       setGBusy(false);
@@ -172,10 +177,19 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
           />
         </Field>
         <div className="flex items-center gap-3">
-          <Button variant="ghost" className="text-xs" disabled={gBusy} onClick={connectGoogle}>
+          <Button variant="outline" className="text-xs" disabled={gBusy} onClick={connectGoogle}>
             {gBusy ? '授权中…' : '连接 Google（开始授权）'}
           </Button>
-          {gMsg && <span className="text-[11px] text-muted">{gMsg}</span>}
+          {gMsg &&
+            (gStatus === 'connected' ? (
+              <span className="rounded-full bg-[#22c55e]/15 px-2 py-0.5 text-[11px] font-medium text-[#4ade80] ring-1 ring-inset ring-[#22c55e]/40">
+                {gMsg}
+              </span>
+            ) : (
+              <span className={cn('text-[11px]', gStatus === 'error' ? 'text-danger' : 'text-muted')}>
+                {gMsg}
+              </span>
+            ))}
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="主代理模型">
@@ -239,7 +253,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
             <span className="text-[11px] text-muted/60">· 启用后重启生效，首次会自动下载内核</span>
           </label>
           <div className="flex items-center gap-3">
-            <Button variant="ghost" className="text-xs" disabled={bBusy} onClick={browserLogin}>
+            <Button variant="outline" className="text-xs" disabled={bBusy} onClick={browserLogin}>
               {bBusy ? '打开中…' : '打开浏览器登录账号并保存'}
             </Button>
             {bMsg && <span className="text-[11px] text-muted">{bMsg}</span>}
@@ -250,7 +264,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
         </div>
 
         <div className="flex items-center justify-between border-t border-border pt-3">
-          <Button variant="ghost" onClick={requestNotif} className="text-xs">
+          <Button variant="outline" onClick={requestNotif} className="text-xs">
             开启桌面通知
           </Button>
           <div className="flex items-center gap-3">
