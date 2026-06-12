@@ -41,10 +41,11 @@ export async function consolidateSession(sessionId: string): Promise<void> {
     return;
   }
 
-  const [messages, artifacts, plan] = await Promise.all([
+  const [messages, artifacts, plan, session] = await Promise.all([
     prisma.message.findMany({ where: { sessionId }, orderBy: { createdAt: 'asc' } }),
     prisma.artifact.findMany({ where: { sessionId } }),
     prisma.planTask.findMany({ where: { sessionId }, orderBy: { ordinal: 'asc' } }),
+    prisma.session.findUnique({ where: { id: sessionId } }),
   ]);
 
   const transcript = messages
@@ -78,7 +79,7 @@ ${artifactsText}
 ${transcript}`;
 
   try {
-    const out = await complete({ system, prompt });
+    const out = await complete({ system, prompt, model: session?.subagentModel || undefined });
     const entries = JSON.parse(extractJsonArray(out)) as ProposedEntry[];
     let n = 0;
     for (const e of entries) {

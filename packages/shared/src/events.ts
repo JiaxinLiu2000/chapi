@@ -81,6 +81,11 @@ export type ServerEvent =
       url: string | null;
       message?: string;
     }
+  | {
+      // Server asks the client to auto-open the live browser panel (agent used a browser tool).
+      type: 'browser.show';
+      sessionId: string;
+    }
   | { type: 'error'; sessionId: string | null; message: string };
 
 export type ServerEventType = ServerEvent['type'];
@@ -120,6 +125,7 @@ export const clientCommandSchema = z.discriminatedUnion('type', [
     type: z.literal('set.config'),
     sessionId: z.string().min(1),
     model: z.string().min(1).optional(),
+    subagentModel: z.string().min(1).optional(),
     effort: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional(),
   }),
   z.object({ type: z.literal('ping') }),

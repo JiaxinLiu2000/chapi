@@ -165,6 +165,11 @@ export class RunMonitor {
     const inputPreview = preview(input.tool_input);
     const { tag, label } = describeActivity(input.tool_name, input.tool_input);
 
+    // Agent is using the browser → ask the UI to auto-open the live browser panel.
+    if (tag === '浏览器') {
+      bus.emit({ type: 'browser.show', sessionId: this.sessionId });
+    }
+
     // When the main thread dispatches a sub-agent, stash its short description so
     // the sub-agent shows a task title the moment it starts.
     if (input.tool_name === 'Task' && !input.agent_id) {

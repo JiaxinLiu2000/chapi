@@ -126,10 +126,16 @@ export class SdkOrchestrator implements Orchestrator {
     return this.runs.has(sessionId);
   }
 
-  async setConfig(sessionId: string, model?: string, effort?: string): Promise<void> {
-    const data: { model?: string; effort?: string } = {};
+  async setConfig(
+    sessionId: string,
+    model?: string,
+    effort?: string,
+    subagentModel?: string,
+  ): Promise<void> {
+    const data: { model?: string; effort?: string; subagentModel?: string } = {};
     if (model) data.model = model;
     if (effort) data.effort = effort;
+    if (subagentModel) data.subagentModel = subagentModel;
     if (Object.keys(data).length === 0) return;
 
     const updated = await prisma.session.update({ where: { id: sessionId }, data });

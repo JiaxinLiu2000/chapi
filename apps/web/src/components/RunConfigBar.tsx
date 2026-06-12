@@ -18,19 +18,28 @@ export function RunConfigBar({ sessionId }: { sessionId: string }) {
   const session = useStore((s) => s.session);
   const completed = session?.status === 'completed';
   const model = session?.model ?? '';
+  const subagentModel = session?.subagentModel ?? model;
   const effort: EffortLevel = session?.effort ?? 'high';
 
-  const patch = (partial: { model?: string; effort?: EffortLevel }) =>
+  const patch = (partial: { model?: string; subagentModel?: string; effort?: EffortLevel }) =>
     useStore.setState((s) => ({ session: s.session ? { ...s.session, ...partial } : s.session }));
 
   const onModel = (value: string) => {
     patch({ model: value });
     getSocket().send({ type: 'set.config', sessionId, model: value });
   };
+  const onSubModel = (value: string) => {
+    patch({ subagentModel: value });
+    getSocket().send({ type: 'set.config', sessionId, subagentModel: value });
+  };
   const onEffort = (value: EffortLevel) => {
     patch({ effort: value });
     getSocket().send({ type: 'set.config', sessionId, effort: value });
   };
+  const optionsFor = (cur: string) =>
+    MODEL_OPTIONS.some((m) => m.id === cur)
+      ? MODEL_OPTIONS
+      : [{ id: cur, label: cur || '(默认)' }, ...MODEL_OPTIONS];
 
   const browserOn = useStore((s) => s.browserViewOn);
   const setBrowserOn = useStore((s) => s.setBrowserViewOn);
@@ -40,22 +49,32 @@ export function RunConfigBar({ sessionId }: { sessionId: string }) {
     getSocket().send({ type: 'browser.view', sessionId, on: next });
   };
 
-  // Always include the current model in the dropdown, even if it's a custom id.
-  const models = MODEL_OPTIONS.some((m) => m.id === model)
-    ? MODEL_OPTIONS
-    : [{ id: model, label: model || '(默认)' }, ...MODEL_OPTIONS];
-
   return (
     <div className="flex items-center gap-2 border-b border-border bg-panel/40 px-4 py-2">
-      <span className="text-xs text-muted">模型</span>
+      <span className="text-xs text-muted">主模型</span>
       <select
         className={selectCls}
         value={model}
         disabled={completed}
         onChange={(e) => onModel(e.target.value)}
-        title="切换 Claude 模型（即时生效）"
+        title="主代理模型（即时生效）"
       >
-        {models.map((m) => (
+        {optionsFor(model).map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.label}
+          </option>
+        ))}
+      </select>
+
+      <span className="ml-3 text-xs text-muted">子模型</span>
+      <select
+        className={selectCls}
+        value={subagentModel}
+        disabled={completed}
+        onChange={(e) => onSubModel(e.target.value)}
+        title="子代理 / 摘要与复盘所用模型"
+      >
+        {optionsFor(subagentModel).map((m) => (
           <option key={m.id} value={m.id}>
             {m.label}
           </option>

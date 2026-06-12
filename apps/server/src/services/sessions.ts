@@ -69,6 +69,7 @@ export async function createSession(input: CreateSessionInput): Promise<SessionD
       slug,
       title,
       model: input.model ?? models.main,
+      subagentModel: models.subagent,
       permissionProfile: profile,
       status: 'active',
     },

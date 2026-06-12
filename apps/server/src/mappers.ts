@@ -61,6 +61,7 @@ export function toSessionDTO(s: Session): SessionDTO {
     title: s.title,
     status: s.status as SessionStatus,
     model: s.model,
+    subagentModel: s.subagentModel || s.model,
     effort: s.effort as EffortLevel,
     permissionProfile: s.permissionProfile as PermissionProfile,
     usage: sessionUsage(s),

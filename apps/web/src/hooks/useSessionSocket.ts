@@ -8,7 +8,17 @@ export function useSessionSocket(sessionId: string | null): void {
   useEffect(() => {
     if (!sessionId) return;
     const socket = getSocket();
-    const off = socket.on((e) => useStore.getState().applyEvent(e));
+    const off = socket.on((e) => {
+      useStore.getState().applyEvent(e);
+      // When the agent starts using the browser, auto-open the live view.
+      if (e.type === 'browser.show' && e.sessionId === sessionId) {
+        const st = useStore.getState();
+        if (!st.browserViewOn) {
+          st.setBrowserViewOn(true);
+          socket.send({ type: 'browser.view', sessionId, on: true });
+        }
+      }
+    });
     socket.subscribe(sessionId);
     return () => {
       off();

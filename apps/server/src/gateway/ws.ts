@@ -93,7 +93,12 @@ export function attachWebSocket(server: HttpServer): WebSocketServer {
             await getOrchestrator().markCompleted(cmd.sessionId);
             return;
           case 'set.config':
-            await getOrchestrator().setConfig(cmd.sessionId, cmd.model, cmd.effort);
+            await getOrchestrator().setConfig(
+              cmd.sessionId,
+              cmd.model,
+              cmd.effort,
+              cmd.subagentModel,
+            );
             return;
           case 'browser.view':
             if (cmd.on) {

@@ -37,6 +37,7 @@ export async function summarizeSession(sessionId: string): Promise<void> {
     const summary = await complete({
       system: '你在为一个工作流会话做滚动摘要，便于节省上下文。用简洁中文要点。',
       prompt: `总结用户的需求与现阶段已完成/进行中的内容（简洁要点式，不超过 ~200 字）：\n\n对话：\n${transcript}`,
+      model: session.subagentModel || undefined,
     });
     await prisma.memorySummary.create({
       data: { sessionId, roundStart: fromRound, roundEnd: session.roundCount, summary },

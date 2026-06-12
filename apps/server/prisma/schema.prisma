@@ -14,6 +14,7 @@ model Session {
   title               String   @default("New session") @db.VarChar(300)
   status              String   @default("active") // active | completed | deleted
   model               String
+  subagentModel       String   @default("") // per-session sub-agent / summary model ("" = global default)
   effort              String   @default("high") // low | medium | high | xhigh | max
   permissionProfile   String   @default("web") // web | vscode
   sdkSessionId        String? // Claude Agent SDK session id, for resume

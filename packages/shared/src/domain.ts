@@ -83,6 +83,7 @@ export interface SessionDTO {
   title: string;
   status: SessionStatus;
   model: string;
+  subagentModel: string;
   effort: EffortLevel;
   permissionProfile: PermissionProfile;
   usage: UsageDTO;

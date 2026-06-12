@@ -4,6 +4,13 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.19
+
+- **Auto-open the 实时浏览器 panel** when the agent uses a browser tool: the server emits a
+  `browser.show` signal on browser-tool use; the client opens the panel and starts the screencast.
+- **Sub-agent model selector** added to the chat top bar (主模型 / 子模型 / 思考强度), per session.
+  The sub-model is used for sub-tasks and the summary/consolidation LLM calls; switchable live.
+
 ## v0.1.18
 
 - Launcher now **pre-warms the dev routes** (`/`, `/wiki`, `/s/[slug]`) in the background right
