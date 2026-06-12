@@ -89,6 +89,12 @@ export interface UploadResponse {
 
 // ── Generic ──────────────────────────────────────────────────────────────────
 
+export interface GoogleConnectResponse {
+  status: 'connected' | 'authorizing' | 'error';
+  authUrl?: string;
+  message: string;
+}
+
 export interface OkResponse {
   ok: true;
 }

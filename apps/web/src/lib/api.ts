@@ -2,6 +2,7 @@ import type {
   CreateSessionResponse,
   ListSessionsResponse,
   SessionDetailResponse,
+  GoogleConnectResponse,
   SettingsResponse,
   UpdateSettingsInput,
   UploadResponse,
@@ -52,6 +53,8 @@ export const api = {
 
   updateSettings: (input: UpdateSettingsInput) =>
     req<SettingsResponse>('/settings', { method: 'PUT', body: JSON.stringify(input) }),
+
+  connectGoogle: () => req<GoogleConnectResponse>('/google/connect', { method: 'POST' }),
 
   listWiki: () => req<WikiListResponse>('/wiki'),
 

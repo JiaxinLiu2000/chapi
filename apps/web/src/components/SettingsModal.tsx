@@ -61,6 +61,29 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 
   const set = (k: keyof UpdateSettingsInput, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
+  const [gBusy, setGBusy] = useState(false);
+  const [gMsg, setGMsg] = useState('');
+  const connectGoogle = async () => {
+    setGBusy(true);
+    setGMsg('正在启动 Google 授权…（首次可能需下载 workspace-mcp，请稍候）');
+    try {
+      // Save any edited OAuth credentials first so the connect probe uses them.
+      await api.updateSettings(form);
+      const r = await api.connectGoogle();
+      if (r.status === 'authorizing' && r.authUrl) {
+        window.open(r.authUrl, '_blank', 'noopener,noreferrer');
+        setGMsg(r.message + '（已在新标签打开授权页）');
+      } else {
+        setGMsg(r.message);
+      }
+      await refetch();
+    } catch (e) {
+      setGMsg(e instanceof Error ? e.message : '连接失败');
+    } finally {
+      setGBusy(false);
+    }
+  };
+
   // model dropdown: always include the current value, even if it's a custom id
   const modelOptions = (current?: string) => {
     const base = MODEL_OPTIONS.map((m) => ({ id: m.id, label: m.label }));
@@ -131,6 +154,12 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
             onChange={(e) => set('googleUserEmail', e.target.value)}
           />
         </Field>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" className="text-xs" disabled={gBusy} onClick={connectGoogle}>
+            {gBusy ? '授权中…' : '连接 Google（开始授权）'}
+          </Button>
+          {gMsg && <span className="text-[11px] text-muted">{gMsg}</span>}
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="主代理模型">
             <select

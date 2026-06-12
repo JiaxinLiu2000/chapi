@@ -4,6 +4,13 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.8
+
+- Settings: add a **连接 Google（开始授权）** button that proactively starts Google Workspace
+  OAuth from Settings (instead of waiting for the first agent task). It runs a tool-only probe
+  through the google_workspace MCP and opens the returned consent URL in a new tab; reports
+  already-connected when access works.
+
 ## v0.1.7
 
 - Fix: Google Workspace now **auto-enables when OAuth credentials are set in Settings** —

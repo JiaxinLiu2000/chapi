@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { updateSettingsSchema } from '@chapi/shared';
 import { settings } from '../../secrets.js';
+import { connectGoogle } from '../../services/googleAuth.js';
 
 export async function settingsRoutes(app: FastifyInstance): Promise<void> {
   app.get('/settings', async () => {
@@ -14,5 +15,10 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     }
     await settings.update(parsed.data);
     return { settings: await settings.getPublic() };
+  });
+
+  // Proactively start Google Workspace authorization from the Settings UI.
+  app.post('/google/connect', async () => {
+    return connectGoogle();
   });
 }
