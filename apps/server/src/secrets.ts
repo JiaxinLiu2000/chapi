@@ -17,6 +17,7 @@ const KEY_SUBAGENT_MODEL = 'subagent_model';
 const KEY_EMBEDDING_MODEL = 'embedding_model';
 const KEY_CANVA_ENABLED = 'canva_enabled';
 const KEY_BROWSER_ENABLED = 'browser_enabled';
+const KEY_BROWSER_HIDDEN = 'browser_hidden';
 const KEY_MAX_SUBAGENTS = 'max_subagents';
 
 const SECRET_KEYS = new Set([KEY_OPENAI, KEY_ANTHROPIC, KEY_GOOGLE_ID, KEY_GOOGLE_SECRET]);
@@ -130,6 +131,11 @@ class SettingsStore {
     return raw === 'true';
   }
 
+  /** Run the browser headless (no taskbar window); still visible via the CDP screencast. */
+  async getBrowserHidden(): Promise<boolean> {
+    return (await this.readRaw(KEY_BROWSER_HIDDEN)) === 'true';
+  }
+
   async getMaxSubagents(): Promise<number> {
     const raw = await this.readRaw(KEY_MAX_SUBAGENTS);
     const n = raw ? Number.parseInt(raw, 10) : config.maxSubagents;
@@ -150,6 +156,7 @@ class SettingsStore {
       googleUserEmail: (await this.getGoogleUserEmail()) ?? '',
       canvaEnabled: await this.getCanvaEnabled(),
       enableBrowser: await this.getBrowserEnabled(),
+      browserHidden: await this.getBrowserHidden(),
       maxSubagents: await this.getMaxSubagents(),
     };
   }
@@ -171,6 +178,10 @@ class SettingsStore {
       [
         KEY_BROWSER_ENABLED,
         input.enableBrowser === undefined ? undefined : String(input.enableBrowser),
+      ],
+      [
+        KEY_BROWSER_HIDDEN,
+        input.browserHidden === undefined ? undefined : String(input.browserHidden),
       ],
       [
         KEY_MAX_SUBAGENTS,

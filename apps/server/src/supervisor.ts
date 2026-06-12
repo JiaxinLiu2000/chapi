@@ -66,20 +66,39 @@ class Supervisor {
       this.pushLog(`install 失败: ${e}. 请确认已安装 uv (https://docs.astral.sh/uv/).`);
       this.starting = false;
     });
+    const hidden = await settings.getBrowserHidden();
     install.on('exit', (code) => {
-      this.pushLog(`内核检查/安装完成 (code ${code})，启动 cloakserve…`);
-      this.startCloakserve();
+      this.pushLog(`内核检查/安装完成 (code ${code})，启动 cloakbrowser…`);
+      this.startCloakserve(hidden);
       this.starting = false;
     });
   }
 
-  private startCloakserve(): void {
+  /** Stop the current browser and start a fresh one (e.g. after toggling hidden mode). */
+  async restartBrowser(): Promise<void> {
+    this.stop();
+    this.serveProc = null;
+    await sleep(1500);
+    await this.ensureBrowserRunning();
+  }
+
+  private startCloakserve(hidden: boolean): void {
     if (this.serveProc) return;
     const port = String(config.cloakbrowserCdpPort);
-    this.pushLog(`启动持久化 cloakbrowser (headed, CDP 127.0.0.1:${port}, profile ${config.cloakbrowserProfileDir})`);
+    this.pushLog(
+      `启动持久化 cloakbrowser (${hidden ? 'headless/隐藏' : 'headed/可见'}, CDP 127.0.0.1:${port})`,
+    );
     const child = spawn(
       'uvx',
-      ['--from', 'cloakbrowser', 'python', SERVE_SCRIPT, config.cloakbrowserProfileDir, port],
+      [
+        '--from',
+        'cloakbrowser',
+        'python',
+        SERVE_SCRIPT,
+        config.cloakbrowserProfileDir,
+        port,
+        String(hidden),
+      ],
       { shell: isWin, stdio: ['ignore', 'pipe', 'pipe'] },
     );
     child.stdout?.on('data', (d) => this.pushLog(`cloakserve: ${d}`));
@@ -109,10 +128,7 @@ class Supervisor {
     try {
       await CDP.New({ host: '127.0.0.1', port: config.cloakbrowserCdpPort, url });
       this.pushLog(`已在 cloakbrowser 打开登录页: ${url}`);
-      return {
-        ok: true,
-        message: '已在 cloakbrowser 窗口打开登录页，请在该窗口登录账号，登录态会持久保存并被 agent 复用。',
-      };
+      return { ok: true, message: '' };
     } catch (e) {
       return { ok: false, message: `打开登录页失败: ${e instanceof Error ? e.message : String(e)}` };
     }

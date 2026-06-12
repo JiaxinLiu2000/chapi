@@ -58,6 +58,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
         googleUserEmail: s.googleUserEmail,
         maxSubagents: s.maxSubagents,
         enableBrowser: s.enableBrowser,
+        browserHidden: s.browserHidden,
       });
   }, [s]);
 
@@ -250,6 +251,14 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                 <span className="rounded-full bg-border px-2 py-0.5 text-[10px] text-muted">未运行</span>
               ))}
           </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={Boolean(form.browserHidden)}
+              onChange={(e) => setForm((f) => ({ ...f, browserHidden: e.target.checked }))}
+            />
+            隐藏浏览器窗口（不在任务栏显示，仅在「实时浏览器」里查看）
+          </label>
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" className="text-xs" disabled={bBusy} onClick={browserLogin}>
               {bBusy ? '启动中…' : '启动浏览器并登录账号'}
@@ -257,7 +266,8 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
           </div>
           {bMsg && <p className="text-[11px] text-muted">{bMsg}</p>}
           <p className="text-[11px] text-muted/60">
-            点击开启浏览器后，请保持该浏览器窗口开启。在里面登录的账号会被保留，下次 AI 就能直接使用这些已登录的网站。
+            点击开启浏览器后，请保持其运行。在里面登录的账号会被保留，下次 AI 直接使用这些已登录网站。
+            隐藏后不在任务栏显示，仍可在「实时浏览器」面板查看；需要手动登录时先取消勾选「隐藏」用可见窗口登录。
           </p>
         </div>
 

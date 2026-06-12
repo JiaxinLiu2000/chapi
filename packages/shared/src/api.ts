@@ -58,6 +58,7 @@ export const updateSettingsSchema = z.object({
   embeddingModel: z.string().optional(),
   canvaEnabled: z.boolean().optional(),
   enableBrowser: z.boolean().optional(),
+  browserHidden: z.boolean().optional(),
   maxSubagents: z.number().int().min(1).max(8).optional(),
 });
 export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>;

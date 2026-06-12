@@ -237,5 +237,6 @@ export interface PublicSettingsDTO {
   googleUserEmail: string;
   canvaEnabled: boolean;
   enableBrowser: boolean;
+  browserHidden: boolean;
   maxSubagents: number;
 }

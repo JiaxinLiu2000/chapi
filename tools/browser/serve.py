@@ -14,7 +14,8 @@ import time
 
 profile = sys.argv[1] if len(sys.argv) > 1 else "./.browser-profile"
 port = sys.argv[2] if len(sys.argv) > 2 else "9222"
-print(f"[cloakserve] starting: profile={profile} cdp=127.0.0.1:{port}", flush=True)
+headless = len(sys.argv) > 3 and str(sys.argv[3]).lower() == "true"
+print(f"[cloakserve] starting: profile={profile} cdp=127.0.0.1:{port} headless={headless}", flush=True)
 
 try:
     from cloakbrowser import launch_persistent_context
@@ -25,7 +26,7 @@ except Exception as e:  # noqa: BLE001
 try:
     ctx = launch_persistent_context(
         profile,
-        headless=False,
+        headless=headless,
         args=[
             f"--remote-debugging-port={port}",
             "--remote-debugging-address=127.0.0.1",

@@ -14,9 +14,18 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.message });
     }
+    const prevHidden = await settings.getBrowserHidden();
     await settings.update(parsed.data);
-    // Turning cloakbrowser on starts cloakserve immediately (no server restart).
+    // Turning cloakbrowser on starts it immediately (no server restart).
     if (parsed.data.enableBrowser === true) void supervisor.ensureBrowserRunning();
+    // Toggling hidden mode relaunches the browser headless/headed.
+    if (
+      parsed.data.browserHidden !== undefined &&
+      parsed.data.browserHidden !== prevHidden &&
+      (await settings.getBrowserEnabled())
+    ) {
+      void supervisor.restartBrowser();
+    }
     return { settings: await settings.getPublic() };
   });
 

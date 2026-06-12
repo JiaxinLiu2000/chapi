@@ -4,6 +4,13 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.17
+
+- Add **隐藏浏览器窗口** toggle: runs cloakbrowser **headless** (no taskbar window) while it stays
+  visible in the 实时浏览器 panel (CDP screencast works headless — verified 9222 reachable).
+  Toggling relaunches the browser; log in with it unhidden, then hide for normal use.
+- Remove the verbose "已在 cloakbrowser 窗口打开登录页…" prompt.
+
 ## v0.1.16
 
 - **Fix: agents kept showing 运行中 after the AI finished** (because the page stayed open and the
