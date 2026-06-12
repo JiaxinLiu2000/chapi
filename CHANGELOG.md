@@ -4,6 +4,12 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.11
+
+- Fix a console hydration warning caused by browser extensions injecting attributes onto
+  `<body>` (e.g. `data-atm-ext-installed`): added `suppressHydrationWarning` to `<html>`/`<body>`
+  in the root layout (the standard Next.js fix; not a code bug).
+
 ## v0.1.10
 
 - Monitoring card overhaul:
