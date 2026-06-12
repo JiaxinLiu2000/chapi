@@ -1,0 +1,28 @@
+{
+  "name": "chapi",
+  "version": "0.1.1",
+  "private": true,
+  "description": "Local web platform to drive Claude Code through natural language workflows",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node scripts/dev.mjs",
+    "dev": "pnpm -r --parallel --stream dev",
+    "build": "pnpm -r build",
+    "server": "pnpm --filter @chapi/server start",
+    "db:generate": "pnpm --filter @chapi/server prisma:generate",
+    "db:migrate": "pnpm --filter @chapi/server prisma:migrate",
+    "db:push": "pnpm --filter @chapi/server prisma:push",
+    "db:up": "docker compose up -d mysql",
+    "db:down": "docker compose down",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "setup": "node scripts/setup.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  },
+  "packageManager": "pnpm@9.15.0"
+}

@@ -1,0 +1,39 @@
+{
+  "name": "@chapi/server",
+  "version": "0.1.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:push": "prisma db push"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.175",
+    "@anthropic-ai/sdk": "^0.104.1",
+    "@chapi/shared": "workspace:*",
+    "@fastify/cors": "^10.0.2",
+    "@fastify/multipart": "^9.0.3",
+    "@lancedb/lancedb": "^0.30.0",
+    "@prisma/client": "^6.2.1",
+    "dotenv": "^16.4.7",
+    "fastify": "^5.2.1",
+    "nanoid": "^5.0.9",
+    "openai": "^6.42.0",
+    "ws": "^8.18.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/ws": "^8.5.13",
+    "prisma": "^6.2.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  }
+}

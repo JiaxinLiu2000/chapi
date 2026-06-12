@@ -1,0 +1,41 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# builds
+dist/
+.next/
+out/
+*.tsbuildinfo
+
+# env & secrets
+.env
+.env.local
+.env.*.local
+secrets.json
+
+# runtime data (per-session workspaces, vector store, uploads)
+sessions/
+data/
+workspaces/raw-materials/*
+!workspaces/raw-materials/INDEX.md
+.browser-profile/
+
+# python sidecars
+.venv/
+__pycache__/
+*.pyc
+
+# logs
+*.log
+logs/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# prisma
+apps/server/prisma/*.db

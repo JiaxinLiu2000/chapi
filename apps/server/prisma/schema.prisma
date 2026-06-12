@@ -1,0 +1,204 @@
+// Chapi data model (MySQL). Relational store of record; vectors live in LanceDB.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id                  String   @id @default(cuid())
+  slug                String   @unique
+  title               String   @default("New session") @db.VarChar(300)
+  status              String   @default("active") // active | completed | deleted
+  model               String
+  permissionProfile   String   @default("web") // web | vscode
+  sdkSessionId        String? // Claude Agent SDK session id, for resume
+  // usage / monitoring rollups
+  inputTokens         Int      @default(0)
+  outputTokens        Int      @default(0)
+  cacheReadTokens     Int      @default(0)
+  cacheCreationTokens Int      @default(0)
+  totalTokens         Int      @default(0)
+  costUsd             Float    @default(0)
+  activeMs            Int      @default(0)
+  roundCount          Int      @default(0) // user turns, for 5-round summaries
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  messages         Message[]
+  agentRuns        AgentRun[]
+  toolCalls        ToolCall[]
+  planTasks        PlanTask[]
+  attachments      Attachment[]
+  webPages         WebPage[]
+  artifacts        Artifact[]
+  pendingQuestions PendingQuestion[]
+  approvals        Approval[]
+  memorySummaries  MemorySummary[]
+
+  @@index([status])
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  sessionId  String
+  session    Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role       String // user | assistant | tool | system
+  type       String // SDK message subtype
+  content    Json // ContentBlock[]
+  text       String   @db.Text
+  tokens     Int      @default(0)
+  agentRunId String?
+  createdAt  DateTime @default(now())
+
+  @@index([sessionId])
+}
+
+model AgentRun {
+  id              String    @id @default(cuid())
+  sessionId       String
+  session         Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  name            String // "main" or sub-agent name
+  status          String    @default("running") // idle|running|done|error|interrupted
+  currentTool     String?
+  currentActivity String?   @db.Text
+  inputTokens     Int       @default(0)
+  outputTokens    Int       @default(0)
+  tokens          Int       @default(0)
+  elapsedMs       Int       @default(0)
+  startedAt       DateTime?
+  endedAt         DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([sessionId])
+}
+
+model ToolCall {
+  id            String   @id @default(cuid())
+  sessionId     String
+  session       Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  agentRunId    String?
+  toolName      String
+  inputPreview  String   @db.Text
+  outputPreview String?  @db.Text
+  status        String   @default("running") // running|done|error
+  durationMs    Int?
+  createdAt     DateTime @default(now())
+
+  @@index([sessionId])
+  @@index([agentRunId])
+}
+
+model PlanTask {
+  id        String   @id @default(cuid())
+  sessionId String
+  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  ordinal   Int
+  text      String   @db.Text
+  status    String   @default("pending") // pending|in_progress|done|error
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sessionId])
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  sessionId String
+  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  filename  String
+  path      String   @db.Text
+  mime      String
+  size      Int
+  createdAt DateTime @default(now())
+
+  @@index([sessionId])
+}
+
+model WebPage {
+  id          String   @id @default(cuid())
+  sessionId   String?
+  session     Session? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  url         String   @db.Text
+  title       String?  @db.VarChar(500)
+  summary     String?  @db.Text
+  contentPath String?  @db.Text
+  status      String   @default("fetched")
+  fetchedAt   DateTime @default(now())
+
+  @@index([sessionId])
+}
+
+model Artifact {
+  id        String   @id @default(cuid())
+  sessionId String
+  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  kind      String // file|drive|sheet|doc|draft|pdf
+  pathOrUrl String   @db.Text
+  title     String
+  createdAt DateTime @default(now())
+
+  @@index([sessionId])
+}
+
+model PendingQuestion {
+  id         String    @id @default(cuid())
+  sessionId  String
+  session    Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  agentRunId String?
+  question   String    @db.Text
+  options    Json?
+  answer     String?   @db.Text
+  status     String    @default("open") // open|answered
+  createdAt  DateTime  @default(now())
+  answeredAt DateTime?
+
+  @@index([sessionId])
+}
+
+model Approval {
+  id        String    @id @default(cuid())
+  sessionId String
+  session   Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  summary   String    @db.Text
+  artifacts Json
+  status    String    @default("open") // open|approved|rejected|revise
+  feedback  String?   @db.Text
+  createdAt DateTime  @default(now())
+  decidedAt DateTime?
+
+  @@index([sessionId])
+}
+
+model WikiEntry {
+  id         String   @id @default(cuid())
+  slug       String   @unique
+  title      String   @db.VarChar(300)
+  bodyMd     String   @db.LongText
+  sourceRefs Json
+  tags       Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model MemorySummary {
+  id         String   @id @default(cuid())
+  sessionId  String
+  session    Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  roundStart Int
+  roundEnd   Int
+  summary    String   @db.Text
+  createdAt  DateTime @default(now())
+
+  @@index([sessionId])
+}
+
+model Setting {
+  key       String   @id
+  value     String   @db.Text
+  encrypted Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+}
