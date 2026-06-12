@@ -34,8 +34,11 @@ export function Chat({ sessionId }: { sessionId: string }) {
       <div className="border-t border-border bg-bg/70 px-4 py-3">
         <div className="mx-auto max-w-3xl space-y-3">
           <QuestionDock sessionId={sessionId} />
-          {/* completion button sits to the LEFT, aligned to the composer's bottom */}
+          {/* completion button sits to the RIGHT, aligned to the composer's bottom */}
           <div className="flex items-end gap-2">
+            <div className="flex-1">
+              <Composer sessionId={sessionId} disabled={completed} />
+            </div>
             {completed ? (
               <div className="flex shrink-0 items-center gap-1.5 rounded-xl border border-success/40 bg-success/10 px-3 py-2.5 text-xs font-medium text-success">
                 <CheckCircle2 size={15} /> 已完成并归档
@@ -49,9 +52,6 @@ export function Chat({ sessionId }: { sessionId: string }) {
                 <CheckCircle2 size={15} /> 出色完成
               </button>
             )}
-            <div className="flex-1">
-              <Composer sessionId={sessionId} disabled={completed} />
-            </div>
           </div>
         </div>
       </div>

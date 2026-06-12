@@ -111,8 +111,11 @@ describe('Run engine', () => {
     const msgs = await prisma.message.findMany({ where: { sessionId } });
     expect(msgs.some((m) => m.role === 'assistant' && m.text === 'Hello!')).toBe(true);
 
+    // After a turn completes the main agent settles to 'idle' (waiting for the
+    // next message), not 'done' — the long-lived run stays available.
     const main = await prisma.agentRun.findFirst({ where: { sessionId, name: 'main' } });
-    expect(main?.status).toBe('done');
+    expect(main?.status).toBe('idle');
+    expect(main?.currentTool).toBeNull();
   });
 });
 

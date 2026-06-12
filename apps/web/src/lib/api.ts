@@ -64,6 +64,8 @@ export const api = {
 
   listWiki: () => req<WikiListResponse>('/wiki'),
 
+  clearWiki: () => req<{ ok: true; removed: number }>('/wiki', { method: 'DELETE' }),
+
   wikiEntry: (slug: string) => req<{ entry: WikiEntryDTO }>(`/wiki/${slug}`),
 
   searchWiki: (query: string, k?: number) =>

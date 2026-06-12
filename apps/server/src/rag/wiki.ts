@@ -4,9 +4,17 @@ import { prisma } from '../db/client.js';
 import { createLogger } from '../logger.js';
 import { toWikiEntryDTO } from '../mappers.js';
 import { embed, embedOne, embeddingsAvailable } from './embeddings.js';
-import { lanceSearch, lanceUpsertEntry, type WikiVectorRow } from './lance.js';
+import { lanceClear, lanceSearch, lanceUpsertEntry, type WikiVectorRow } from './lance.js';
 
 const log = createLogger('rag:wiki');
+
+/** Delete all wiki entries (DB) and their vectors (LanceDB). Returns count removed. */
+export async function clearWiki(): Promise<number> {
+  const { count } = await prisma.wikiEntry.deleteMany({});
+  await lanceClear().catch(() => undefined);
+  log.info(`cleared wiki: ${count} entries + vectors`);
+  return count;
+}
 
 function slugify(title: string): string {
   const base = title

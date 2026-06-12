@@ -51,6 +51,10 @@ export class Run {
   async pushUserMessage(text: string): Promise<void> {
     await this.ensureStarted();
     this.input.push(text);
+    // New turn starting → reflect "running" immediately (the long-lived query
+    // doesn't re-emit this between turns).
+    bus.emit({ type: 'run.state', sessionId: this.sessionId, state: 'running' });
+    await this.monitor.markRunning();
   }
 
   async interrupt(): Promise<void> {
@@ -251,5 +255,10 @@ export class Run {
     });
     bus.emit({ type: 'usage.updated', sessionId: this.sessionId, usage: sessionUsage(updated) });
     bus.emit({ type: 'session.updated', session: toSessionDTO(updated) });
+
+    // Turn complete → the agent is idle (waiting for the next message). Settle
+    // agents so the monitor stops showing "运行中" while the page stays open.
+    await this.monitor.settleTurn();
+    bus.emit({ type: 'run.state', sessionId: this.sessionId, state: 'idle' });
   }
 }

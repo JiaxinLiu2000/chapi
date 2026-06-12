@@ -49,6 +49,12 @@ export async function lanceDeleteEntry(entryId: string): Promise<void> {
   await table.delete(`entryId = '${entryId.replace(/'/g, "''")}'`).catch(() => undefined);
 }
 
+/** Drop the entire wiki vector table (used by "clear wiki"). */
+export async function lanceClear(): Promise<void> {
+  const conn = await db();
+  if (await hasTable(conn)) await conn.dropTable(TABLE).catch(() => undefined);
+}
+
 export interface LanceHit {
   entryId: string;
   chunk: string;

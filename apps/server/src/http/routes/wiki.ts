@@ -2,12 +2,17 @@ import type { FastifyInstance } from 'fastify';
 import { wikiSearchSchema } from '@chapi/shared';
 import { prisma } from '../../db/client.js';
 import { toWikiEntryDTO } from '../../mappers.js';
-import { searchWiki } from '../../rag/wiki.js';
+import { clearWiki, searchWiki } from '../../rag/wiki.js';
 
 export async function wikiRoutes(app: FastifyInstance): Promise<void> {
   app.get('/wiki', async () => {
     const entries = await prisma.wikiEntry.findMany({ orderBy: { updatedAt: 'desc' } });
     return { entries: entries.map(toWikiEntryDTO) };
+  });
+
+  app.delete('/wiki', async () => {
+    const removed = await clearWiki();
+    return { ok: true as const, removed };
   });
 
   app.get<{ Params: { slug: string } }>('/wiki/:slug', async (req, reply) => {

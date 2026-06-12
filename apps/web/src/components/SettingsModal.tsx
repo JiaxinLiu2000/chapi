@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { MODEL_OPTIONS, type BrowserStatusResponse, type UpdateSettingsInput } from '@chapi/shared';
+import type { BrowserStatusResponse, UpdateSettingsInput } from '@chapi/shared';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Button } from './ui/Button';
@@ -78,20 +78,6 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
     if (open) void refreshBrowser();
   }, [open]);
 
-  const startBrowser = async () => {
-    setBBusy(true);
-    setBMsg('正在启动浏览器服务…（首次需下载内核，请稍候并点“刷新状态”）');
-    try {
-      await api.updateSettings(form);
-      const st = await api.browserStart();
-      setBStatus(st);
-      setBMsg(st.message);
-    } catch (e) {
-      setBMsg(e instanceof Error ? e.message : '启动失败');
-    } finally {
-      setBBusy(false);
-    }
-  };
   const browserLogin = async () => {
     setBBusy(true);
     setBMsg('正在打开浏览器登录页…（若刚启用，需等内核下载/启动）');
@@ -104,6 +90,19 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
       setBMsg(e instanceof Error ? e.message : '打开失败');
     } finally {
       setBBusy(false);
+    }
+  };
+
+  const [wikiConfirm, setWikiConfirm] = useState(false);
+  const [wikiMsg, setWikiMsg] = useState('');
+  const clearWiki = async () => {
+    try {
+      const r = await api.clearWiki();
+      setWikiMsg(`已清空 AI Wiki（删除 ${r.removed} 条）`);
+    } catch (e) {
+      setWikiMsg(e instanceof Error ? e.message : '清空失败');
+    } finally {
+      setWikiConfirm(false);
     }
   };
 
@@ -134,14 +133,6 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
     }
   };
 
-  // model dropdown: always include the current value, even if it's a custom id
-  const modelOptions = (current?: string) => {
-    const base = MODEL_OPTIONS.map((m) => ({ id: m.id, label: m.label }));
-    return current && !base.some((m) => m.id === current)
-      ? [{ id: current, label: current }, ...base]
-      : base;
-  };
-
   const save = async () => {
     setSaving(true);
     setMsg('');
@@ -162,7 +153,8 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="设置">
+    <>
+      <Modal open={open} onClose={onClose} title="设置">
       <div className="space-y-4">
         <p className="text-xs text-muted/70">
           Claude 用本机 Claude Code 凭证运行，无需 Anthropic API Key。
@@ -219,34 +211,6 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
           ) : null}
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="主代理模型">
-            <select
-              className={inputCls}
-              value={form.mainModel ?? ''}
-              onChange={(e) => set('mainModel', e.target.value)}
-            >
-              {modelOptions(form.mainModel).map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="子代理模型">
-            <select
-              className={inputCls}
-              value={form.subagentModel ?? ''}
-              onChange={(e) => set('subagentModel', e.target.value)}
-            >
-              {modelOptions(form.subagentModel).map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
           <Field label="嵌入模型 (OpenAI)">
             <input
               className={inputCls}
@@ -287,31 +251,26 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
               ))}
           </label>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" className="text-xs" disabled={bBusy} onClick={startBrowser}>
-              {bBusy ? '处理中…' : '启动/重启浏览器服务'}
-            </Button>
             <Button variant="outline" className="text-xs" disabled={bBusy} onClick={browserLogin}>
-              打开浏览器登录账号
-            </Button>
-            <Button variant="ghost" className="text-xs" onClick={refreshBrowser}>
-              刷新状态
+              {bBusy ? '启动中…' : '启动浏览器并登录账号'}
             </Button>
           </div>
           {bMsg && <p className="text-[11px] text-muted">{bMsg}</p>}
-          {bStatus && bStatus.logs.length > 0 && (
-            <pre className="max-h-32 overflow-y-auto rounded-md border border-border bg-panel2 p-2 text-[10px] leading-relaxed text-muted/80">
-              {bStatus.logs.join('\n')}
-            </pre>
-          )}
           <p className="text-[11px] text-muted/60">
-            cloakserve 是单一持久化浏览器（127.0.0.1:9222）：在它的窗口里登录账号会持久保存，agent 直接复用。
+            点击开启浏览器后，请保持该浏览器窗口开启。在里面登录的账号会被保留，下次 AI 就能直接使用这些已登录的网站。
           </p>
         </div>
 
-        <div className="flex items-center justify-between border-t border-border pt-3">
-          <Button variant="outline" onClick={requestNotif} className="text-xs">
-            开启桌面通知
-          </Button>
+        <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" onClick={requestNotif} className="text-xs">
+              开启桌面通知
+            </Button>
+            <Button variant="outline" onClick={() => setWikiConfirm(true)} className="text-xs">
+              清空 AI Wiki
+            </Button>
+            {wikiMsg && <span className="text-[11px] text-muted">{wikiMsg}</span>}
+          </div>
           <div className="flex items-center gap-3">
             {msg && <span className="text-xs text-muted">{msg}</span>}
             <Button variant="accent" disabled={saving} onClick={save}>
@@ -320,6 +279,26 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
           </div>
         </div>
       </div>
-    </Modal>
+      </Modal>
+
+      <Modal
+        open={wikiConfirm}
+        onClose={() => setWikiConfirm(false)}
+        title="清空 AI Wiki？"
+        className="max-w-sm"
+      >
+        <p className="text-sm text-muted">
+          将<b className="text-text">永久删除所有 AI Wiki 条目及其向量索引</b>，agent 沉淀的可复用经验会全部丢失，无法恢复。确定吗？
+        </p>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setWikiConfirm(false)}>
+            取消
+          </Button>
+          <Button variant="danger" onClick={clearWiki}>
+            确认清空
+          </Button>
+        </div>
+      </Modal>
+    </>
   );
 }

@@ -4,6 +4,18 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.16
+
+- **Fix: agents kept showing 运行中 after the AI finished** (because the page stayed open and the
+  long-lived run never re-emitted idle). The run now settles on each turn: main agent → idle and
+  sub-agents → done on `result`, and re-marks running on the next message. Verified in tests.
+- Settings: add **清空 AI Wiki** button (with confirmation; deletes all entries + vectors).
+- Settings: removed the debug cloakbrowser controls (log box + 刷新状态); merged
+  start + login into one **启动浏览器并登录账号** button; friendlier help text.
+- Settings: removed the 主代理/子代理模型 selectors — use the per-session model selector in the
+  chat top bar instead.
+- Moved the **出色完成** button to the right of the composer.
+
 ## v0.1.15
 
 - **运行耗时 now ticks live** (every second) while the AI is actively running and **pauses**

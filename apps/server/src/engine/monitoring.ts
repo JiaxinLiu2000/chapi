@@ -97,6 +97,44 @@ export class RunMonitor {
     if (run) bus.emit({ type: 'agent.status', sessionId: this.sessionId, agent: toAgentRunDTO(run) });
   }
 
+  /** A new turn is starting — put the main agent back into the running state. */
+  async markRunning(): Promise<void> {
+    const id = this.agents.get('main');
+    if (!id) return;
+    await prisma.agentRun.update({ where: { id }, data: { status: 'running', endedAt: null } });
+    await this.emitAgent(id);
+  }
+
+  /**
+   * A turn finished (the agent is waiting for the next message). Clear the main
+   * agent's live activity and mark it idle; finish any sub-agents still running.
+   */
+  async settleTurn(): Promise<void> {
+    for (const [key, id] of this.agents) {
+      const run = await prisma.agentRun.findUnique({ where: { id } });
+      if (!run) continue;
+      if (key === 'main') {
+        await prisma.agentRun.update({
+          where: { id },
+          data: { status: 'idle', currentTool: null, currentActivity: null },
+        });
+      } else if (run.status === 'running') {
+        const start = this.agentStart.get(id) ?? Date.now();
+        await prisma.agentRun.update({
+          where: { id },
+          data: {
+            status: 'done',
+            currentTool: null,
+            currentActivity: null,
+            endedAt: new Date(),
+            elapsedMs: Date.now() - start,
+          },
+        });
+      }
+      await this.emitAgent(id);
+    }
+  }
+
   async onSubagentStart(input: SubagentStartHookInput): Promise<void> {
     const queue = this.pendingSubagentDesc.get(input.agent_type);
     const title = queue && queue.length ? queue.shift() : undefined;

@@ -98,7 +98,15 @@ function AgentRow({ a }: { a: AgentRunDTO }) {
           )}
         >
           {running && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" />}
-          {running ? '运行中' : a.status === 'interrupted' ? '已中断' : a.status === 'error' ? '出错' : '已结束'}
+          {running
+            ? '运行中'
+            : a.status === 'idle'
+              ? '空闲'
+              : a.status === 'interrupted'
+                ? '已中断'
+                : a.status === 'error'
+                  ? '出错'
+                  : '已结束'}
         </span>
       </div>
 
