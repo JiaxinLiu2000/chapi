@@ -31,6 +31,9 @@ export interface Orchestrator {
 
   /** Stop and drop a session's run (called before deleting the session). */
   abandon(sessionId: string): Promise<void>;
+
+  /** Switch the session's model (live) and/or effort (next turn). */
+  setConfig(sessionId: string, model?: string, effort?: string): Promise<void>;
 }
 
 let active: Orchestrator | null = null;

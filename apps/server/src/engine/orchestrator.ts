@@ -2,6 +2,7 @@ import type { ContentBlock } from '@chapi/shared';
 import { prisma } from '../db/client.js';
 import { bus } from '../gateway/bus.js';
 import { createLogger } from '../logger.js';
+import { toSessionDTO } from '../mappers.js';
 import type { Orchestrator } from '../orchestrator/types.js';
 import { setSessionStatus } from '../services/sessions.js';
 import { consolidateSession } from '../learning/consolidate.js';
@@ -119,6 +120,27 @@ export class SdkOrchestrator implements Orchestrator {
   async abandon(sessionId: string): Promise<void> {
     await this.runs.get(sessionId)?.stop().catch(() => undefined);
     this.runs.delete(sessionId);
+  }
+
+  async setConfig(sessionId: string, model?: string, effort?: string): Promise<void> {
+    const data: { model?: string; effort?: string } = {};
+    if (model) data.model = model;
+    if (effort) data.effort = effort;
+    if (Object.keys(data).length === 0) return;
+
+    const updated = await prisma.session.update({ where: { id: sessionId }, data });
+    const run = this.runs.get(sessionId);
+    if (run) {
+      if (effort) {
+        // Effort can't change on a live query — restart on next message (resume keeps context).
+        await run.stop().catch(() => undefined);
+        this.runs.delete(sessionId);
+      } else if (model) {
+        await run.setModel(model);
+      }
+    }
+    bus.emit({ type: 'session.updated', session: toSessionDTO(updated) });
+    log.info(`session ${sessionId} config → model=${updated.model} effort=${updated.effort}`);
   }
 
   async dispose(): Promise<void> {

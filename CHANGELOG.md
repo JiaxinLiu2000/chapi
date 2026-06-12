@@ -4,6 +4,12 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.2
+
+- Per-session **model and effort selectors** in the session UI (top config bar), with live
+  switching: model changes apply immediately via `query.setModel()`; effort changes apply on
+  the next message (run restarts with `resume` to preserve context). Both persist on the session.
+
 ## v0.1.1
 
 - Cloud-first delivery: prefer generating documents/sheets directly in Google Workspace

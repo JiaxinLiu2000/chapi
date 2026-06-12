@@ -60,6 +60,11 @@ export class Run {
     bus.emit({ type: 'run.state', sessionId: this.sessionId, state: 'idle' });
   }
 
+  /** Live model switch (streaming-input mode). Effort changes require a fresh run. */
+  async setModel(model: string): Promise<void> {
+    await this.q?.setModel(model).catch((err) => log.warn('setModel failed', err));
+  }
+
   async stop(): Promise<void> {
     this.input.close();
     if (this.q) await this.q.interrupt().catch(() => undefined);

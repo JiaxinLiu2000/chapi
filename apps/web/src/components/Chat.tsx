@@ -5,6 +5,7 @@ import { getSocket } from '@/lib/ws';
 import { Composer } from './Composer';
 import { MessageList } from './MessageList';
 import { QuestionDock } from './QuestionDock';
+import { RunConfigBar } from './RunConfigBar';
 
 export function Chat({ sessionId }: { sessionId: string }) {
   const messages = useStore((s) => s.messages);
@@ -15,6 +16,7 @@ export function Chat({ sessionId }: { sessionId: string }) {
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] flex-1 flex-col">
+      <RunConfigBar sessionId={sessionId} />
       <div className="flex-1 overflow-y-auto px-4 py-6">
         <div className="mx-auto max-w-3xl">
           <MessageList messages={messages} streaming={streaming} running={runState === 'running'} />

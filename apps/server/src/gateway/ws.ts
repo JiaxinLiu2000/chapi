@@ -90,6 +90,9 @@ export function attachWebSocket(server: HttpServer): WebSocketServer {
           case 'mark.completed':
             await getOrchestrator().markCompleted(cmd.sessionId);
             return;
+          case 'set.config':
+            await getOrchestrator().setConfig(cmd.sessionId, cmd.model, cmd.effort);
+            return;
         }
       } catch (err) {
         log.error(`command ${cmd.type} failed`, err);

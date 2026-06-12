@@ -97,6 +97,12 @@ export const clientCommandSchema = z.discriminatedUnion('type', [
     feedback: z.string().optional(),
   }),
   z.object({ type: z.literal('mark.completed'), sessionId: z.string().min(1) }),
+  z.object({
+    type: z.literal('set.config'),
+    sessionId: z.string().min(1),
+    model: z.string().min(1).optional(),
+    effort: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional(),
+  }),
   z.object({ type: z.literal('ping') }),
 ]);
 

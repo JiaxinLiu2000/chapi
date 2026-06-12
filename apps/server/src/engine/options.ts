@@ -1,5 +1,11 @@
 import type { Session } from '@prisma/client';
-import type { CanUseTool, HookCallbackMatcher, HookEvent, Options } from '@anthropic-ai/claude-agent-sdk';
+import type {
+  CanUseTool,
+  EffortLevel,
+  HookCallbackMatcher,
+  HookEvent,
+  Options,
+} from '@anthropic-ai/claude-agent-sdk';
 import type { PermissionProfile } from '@chapi/shared';
 import { config, sessionPaths } from '../config.js';
 import { disallowedToolsFor } from './permissions.js';
@@ -26,6 +32,7 @@ export function buildRunOptions(session: Session, deps: BuildOptionsDeps): Optio
 
   return {
     model: session.model,
+    effort: session.effort as EffortLevel,
     cwd: sp.sandbox,
     additionalDirectories: [
       sp.memory,
