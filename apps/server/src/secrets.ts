@@ -10,6 +10,7 @@ const KEY_OPENAI = 'openai_key';
 const KEY_ANTHROPIC = 'anthropic_key';
 const KEY_GOOGLE_ID = 'google_oauth_client_id';
 const KEY_GOOGLE_SECRET = 'google_oauth_client_secret';
+const KEY_GOOGLE_EMAIL = 'google_user_email';
 const KEY_MAIN_MODEL = 'main_model';
 const KEY_SUBAGENT_MODEL = 'subagent_model';
 const KEY_EMBEDDING_MODEL = 'embedding_model';
@@ -96,6 +97,10 @@ class SettingsStore {
     };
   }
 
+  async getGoogleUserEmail(): Promise<string | undefined> {
+    return (await this.readRaw(KEY_GOOGLE_EMAIL)) || config.googleUserEmail;
+  }
+
   async getModels(): Promise<{ main: string; subagent: string; embedding: string }> {
     return {
       main: (await this.readRaw(KEY_MAIN_MODEL)) || config.mainModel,
@@ -118,6 +123,7 @@ class SettingsStore {
       hasOpenAiKey: Boolean(await this.getOpenAiKey()),
       hasAnthropicKey: Boolean(await this.getAnthropicKey()),
       hasGoogleOAuth: Boolean(google.clientId && google.clientSecret),
+      googleUserEmail: (await this.getGoogleUserEmail()) ?? '',
       canvaEnabled: await this.getCanvaEnabled(),
     };
   }
@@ -128,6 +134,7 @@ class SettingsStore {
       [KEY_ANTHROPIC, input.anthropicKey],
       [KEY_GOOGLE_ID, input.googleOAuthClientId],
       [KEY_GOOGLE_SECRET, input.googleOAuthClientSecret],
+      [KEY_GOOGLE_EMAIL, input.googleUserEmail],
       [KEY_MAIN_MODEL, input.mainModel],
       [KEY_SUBAGENT_MODEL, input.subagentModel],
       [KEY_EMBEDDING_MODEL, input.embeddingModel],

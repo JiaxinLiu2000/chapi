@@ -52,6 +52,7 @@ export const updateSettingsSchema = z.object({
   anthropicKey: z.string().optional(),
   googleOAuthClientId: z.string().optional(),
   googleOAuthClientSecret: z.string().optional(),
+  googleUserEmail: z.string().optional(),
   mainModel: z.string().optional(),
   subagentModel: z.string().optional(),
   embeddingModel: z.string().optional(),

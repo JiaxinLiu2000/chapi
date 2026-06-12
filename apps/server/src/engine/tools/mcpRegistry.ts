@@ -38,6 +38,7 @@ export async function buildExternalMcpServers(): Promise<Record<string, McpServe
   if (process.env.CHAPI_ENABLE_GOOGLE === '1') {
     const google = await settings.getGoogleOAuth();
     if (google.clientId && google.clientSecret) {
+      const userEmail = await settings.getGoogleUserEmail();
       servers.google_workspace = {
         type: 'stdio',
         command: 'uvx',
@@ -45,6 +46,7 @@ export async function buildExternalMcpServers(): Promise<Record<string, McpServe
         env: {
           GOOGLE_OAUTH_CLIENT_ID: google.clientId,
           GOOGLE_OAUTH_CLIENT_SECRET: google.clientSecret,
+          ...(userEmail ? { USER_GOOGLE_EMAIL: userEmail } : {}),
         },
       };
     } else {

@@ -4,6 +4,16 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.3
+
+- Settings: add a **Google account email** field (passed as `USER_GOOGLE_EMAIL` to the
+  Google Workspace MCP so the agent operates as that account); seeded to
+  `joannaliubus@gmail.com` in env defaults.
+- Settings: **remove the Anthropic API Key field** — the engine uses this machine's
+  Claude Code credentials.
+- Settings: **main/sub-agent model are now dropdowns** (from `MODEL_OPTIONS`) instead of
+  free-text inputs.
+
 ## v0.1.2
 
 - Per-session **model and effort selectors** in the session UI (top config bar), with live

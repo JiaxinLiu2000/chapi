@@ -29,6 +29,7 @@ const envSchema = z.object({
   CLOAKBROWSER_PROFILE_DIR: z.string().default('./.browser-profile'),
   GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_USER_EMAIL: z.string().optional(),
 });
 
 const env = envSchema.parse(process.env);
@@ -54,6 +55,7 @@ export const config = {
   cloakbrowserProfileDir: abs(env.CLOAKBROWSER_PROFILE_DIR),
   googleOAuthClientId: env.GOOGLE_OAUTH_CLIENT_ID,
   googleOAuthClientSecret: env.GOOGLE_OAUTH_CLIENT_SECRET,
+  googleUserEmail: env.GOOGLE_USER_EMAIL,
   paths: {
     repoRoot: REPO_ROOT,
     workspaces: abs(env.WORKSPACES_DIR),

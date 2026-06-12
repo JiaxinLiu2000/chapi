@@ -229,5 +229,6 @@ export interface PublicSettingsDTO {
   hasOpenAiKey: boolean;
   hasAnthropicKey: boolean;
   hasGoogleOAuth: boolean;
+  googleUserEmail: string;
   canvaEnabled: boolean;
 }

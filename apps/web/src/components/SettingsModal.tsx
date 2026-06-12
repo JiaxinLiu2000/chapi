@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { UpdateSettingsInput } from '@chapi/shared';
+import { MODEL_OPTIONS, type UpdateSettingsInput } from '@chapi/shared';
 import { api } from '@/lib/api';
 import { Button } from './ui/Button';
 import { Modal } from './ui/Modal';
@@ -40,10 +40,24 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
   const [msg, setMsg] = useState('');
 
   useEffect(() => {
-    if (s) setForm({ mainModel: s.mainModel, subagentModel: s.subagentModel, embeddingModel: s.embeddingModel });
+    if (s)
+      setForm({
+        mainModel: s.mainModel,
+        subagentModel: s.subagentModel,
+        embeddingModel: s.embeddingModel,
+        googleUserEmail: s.googleUserEmail,
+      });
   }, [s]);
 
   const set = (k: keyof UpdateSettingsInput, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  // model dropdown: always include the current value, even if it's a custom id
+  const modelOptions = (current?: string) => {
+    const base = MODEL_OPTIONS.map((m) => ({ id: m.id, label: m.label }));
+    return current && !base.some((m) => m.id === current)
+      ? [{ id: current, label: current }, ...base]
+      : base;
+  };
 
   const save = async () => {
     setSaving(true);
@@ -51,7 +65,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
     try {
       await api.updateSettings(form);
       await refetch();
-      setForm((f) => ({ ...f, openAiKey: '', anthropicKey: '', googleOAuthClientSecret: '' }));
+      setForm((f) => ({ ...f, openAiKey: '', googleOAuthClientSecret: '' }));
       setMsg('已保存');
     } catch (e) {
       setMsg(e instanceof Error ? e.message : '保存失败');
@@ -67,18 +81,9 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
   return (
     <Modal open={open} onClose={onClose} title="设置">
       <div className="space-y-4">
-        <Field
-          label="Anthropic API Key"
-          hint={s?.hasAnthropicKey ? '已配置（留空保持不变）' : '可选：留空则使用本机 Claude Code 登录凭证'}
-        >
-          <input
-            className={inputCls}
-            type="password"
-            placeholder={s?.hasAnthropicKey ? '••••••••（已保存）' : '留空用本机凭证，或 sk-ant-…'}
-            value={form.anthropicKey ?? ''}
-            onChange={(e) => set('anthropicKey', e.target.value)}
-          />
-        </Field>
+        <p className="text-xs text-muted/70">
+          Claude 用本机 Claude Code 凭证运行，无需 Anthropic API Key。
+        </p>
         <Field label="OpenAI API Key" hint={s?.hasOpenAiKey ? '已配置（留空保持不变）' : 'RAG 嵌入用'}>
           <input
             className={inputCls}
@@ -106,16 +111,41 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
             />
           </Field>
         </div>
+        <Field label="Google 账号邮箱" hint="代理以此账号操作 Workspace/Drive/Gmail 草稿">
+          <input
+            className={inputCls}
+            type="email"
+            placeholder="name@gmail.com"
+            value={form.googleUserEmail ?? ''}
+            onChange={(e) => set('googleUserEmail', e.target.value)}
+          />
+        </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="主代理模型">
-            <input className={inputCls} value={form.mainModel ?? ''} onChange={(e) => set('mainModel', e.target.value)} />
+            <select
+              className={inputCls}
+              value={form.mainModel ?? ''}
+              onChange={(e) => set('mainModel', e.target.value)}
+            >
+              {modelOptions(form.mainModel).map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label="子代理模型">
-            <input
+            <select
               className={inputCls}
               value={form.subagentModel ?? ''}
               onChange={(e) => set('subagentModel', e.target.value)}
-            />
+            >
+              {modelOptions(form.subagentModel).map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
           </Field>
         </div>
         <Field label="嵌入模型 (OpenAI)">
