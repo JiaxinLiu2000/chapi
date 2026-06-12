@@ -11,6 +11,7 @@ const KEY_ANTHROPIC = 'anthropic_key';
 const KEY_GOOGLE_ID = 'google_oauth_client_id';
 const KEY_GOOGLE_SECRET = 'google_oauth_client_secret';
 const KEY_GOOGLE_EMAIL = 'google_user_email';
+const KEY_GOOGLE_CONNECTED = 'google_connected';
 const KEY_MAIN_MODEL = 'main_model';
 const KEY_SUBAGENT_MODEL = 'subagent_model';
 const KEY_EMBEDDING_MODEL = 'embedding_model';
@@ -103,6 +104,14 @@ class SettingsStore {
     return (await this.readRaw(KEY_GOOGLE_EMAIL)) || config.googleUserEmail;
   }
 
+  async getGoogleConnected(): Promise<boolean> {
+    return (await this.readRaw(KEY_GOOGLE_CONNECTED)) === 'true';
+  }
+
+  async setGoogleConnected(value: boolean): Promise<void> {
+    await this.write(KEY_GOOGLE_CONNECTED, String(value));
+  }
+
   async getModels(): Promise<{ main: string; subagent: string; embedding: string }> {
     return {
       main: (await this.readRaw(KEY_MAIN_MODEL)) || config.mainModel,
@@ -137,6 +146,7 @@ class SettingsStore {
       hasOpenAiKey: Boolean(await this.getOpenAiKey()),
       hasAnthropicKey: Boolean(await this.getAnthropicKey()),
       hasGoogleOAuth: Boolean(google.clientId && google.clientSecret),
+      googleConnected: await this.getGoogleConnected(),
       googleUserEmail: (await this.getGoogleUserEmail()) ?? '',
       canvaEnabled: await this.getCanvaEnabled(),
       enableBrowser: await this.getBrowserEnabled(),

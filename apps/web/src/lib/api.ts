@@ -59,6 +59,7 @@ export const api = {
   connectGoogle: () => req<GoogleConnectResponse>('/google/connect', { method: 'POST' }),
 
   browserStatus: () => req<BrowserStatusResponse>('/browser/status'),
+  browserStart: () => req<BrowserStatusResponse>('/browser/start', { method: 'POST' }),
   browserLogin: () => req<BrowserLoginResponse>('/browser/login', { method: 'POST' }),
 
   listWiki: () => req<WikiListResponse>('/wiki'),

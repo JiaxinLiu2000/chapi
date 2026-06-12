@@ -1,8 +1,29 @@
 'use client';
+import { useEffect, useRef, useState } from 'react';
 import { Activity, Clock, Coins, Cpu } from 'lucide-react';
 import type { AgentRunDTO } from '@chapi/shared';
 import { useStore } from '@/lib/store';
 import { cn, formatCost, formatDuration, formatTokens } from '@/lib/utils';
+
+/**
+ * Live "active time" that ticks each second while the AI is actively running and
+ * freezes when it pauses (idle, or waiting on a user question/approval). Re-anchors
+ * to the authoritative server value whenever it updates.
+ */
+function useLiveElapsed(baseMs: number, ticking: boolean): number {
+  const [, force] = useState(0);
+  const anchor = useRef({ base: baseMs, at: Date.now() });
+  useEffect(() => {
+    anchor.current = { base: baseMs, at: Date.now() };
+    force((n) => n + 1);
+  }, [baseMs, ticking]);
+  useEffect(() => {
+    if (!ticking) return;
+    const id = setInterval(() => force((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [ticking]);
+  return ticking ? anchor.current.base + (Date.now() - anchor.current.at) : baseMs;
+}
 
 const runStateLabel: Record<string, string> = {
   idle: '空闲',
@@ -121,8 +142,13 @@ export function MonitorCard() {
   const plan = useStore((s) => s.plan);
   const agents = useStore((s) => s.agents);
   const runState = useStore((s) => s.runState);
+  const questions = useStore((s) => s.questions);
+  const approvals = useStore((s) => s.approvals);
 
   const done = plan.filter((t) => t.status === 'done').length;
+  // tick while actively running; pause when idle or waiting on the user (HITL)
+  const ticking = runState === 'running' && questions.length === 0 && approvals.length === 0;
+  const liveMs = useLiveElapsed(usage?.activeMs ?? 0, ticking);
 
   return (
     <aside className="hidden h-[calc(100vh-3.5rem)] w-72 shrink-0 overflow-y-auto border-r border-border bg-panel/50 p-3 lg:block">
@@ -133,7 +159,7 @@ export function MonitorCard() {
           {runStateLabel[runState] ?? runState}
         </div>
         <div className="grid grid-cols-2 gap-2 text-xs">
-          <Stat icon={<Clock size={13} />} label="运行耗时" value={formatDuration(usage?.activeMs ?? 0)} />
+          <Stat icon={<Clock size={13} />} label="运行耗时" value={formatDuration(liveMs)} />
           <Stat icon={<Coins size={13} />} label="Token" value={formatTokens(usage?.totalTokens ?? 0)} />
           <Stat icon={<Activity size={13} />} label="成本" value={formatCost(usage?.costUsd ?? 0)} />
           <Stat icon={<Cpu size={13} />} label="代理" value={String(agents.length || 0)} />

@@ -107,6 +107,7 @@ export interface BrowserStatusResponse {
   enabled: boolean; // enableBrowser setting
   profileDir: string;
   message: string;
+  logs: string[]; // recent cloakserve/install log lines for diagnostics
 }
 
 export interface OkResponse {

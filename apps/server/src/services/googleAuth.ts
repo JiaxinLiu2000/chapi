@@ -79,6 +79,7 @@ export async function connectGoogle(): Promise<GoogleConnectResponse> {
       };
     }
     if (/ALREADY_CONNECTED/i.test(textOut)) {
+      await settings.setGoogleConnected(true);
       return { status: 'connected', message: 'Google 已连接，可直接使用。' };
     }
     return {

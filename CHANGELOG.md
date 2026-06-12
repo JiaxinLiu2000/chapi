@@ -4,6 +4,20 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.15
+
+- **运行耗时 now ticks live** (every second) while the AI is actively running and **pauses**
+  when idle or waiting on a user question/approval; re-anchors to the server's authoritative value.
+- **Fix cloakbrowser ECONNREFUSED 127.0.0.1:9222.** The package has no `cloakserve` command
+  (only `cloakbrowser` for binary management). The supervisor now launches a persistent, headed
+  cloakbrowser via `tools/browser/serve.py` (`launch_persistent_context(..., args=["--remote-debugging-port=9222"])`).
+  **Verified live: CDP on 9222 is reachable** (Chrome/146). Logs are captured and shown in Settings;
+  enabling the toggle starts it immediately; login opens a tab in that same persistent browser.
+- **Completion button moved left**, compact, side-by-side with the composer bottom, **with a
+  confirmation dialog** (warns the session becomes read-only).
+- **Settings shows "Google 已连接" persistently** once authorized (persisted flag), not only right
+  after clicking connect.
+
 ## v0.1.14
 
 - Fix duplicate "主代理" rows when opening a history conversation. Each run used to create a

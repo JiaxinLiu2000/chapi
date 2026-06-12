@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { MODEL_OPTIONS, type UpdateSettingsInput } from '@chapi/shared';
+import { MODEL_OPTIONS, type BrowserStatusResponse, type UpdateSettingsInput } from '@chapi/shared';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Button } from './ui/Button';
@@ -65,13 +65,41 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
 
   const [bBusy, setBBusy] = useState(false);
   const [bMsg, setBMsg] = useState('');
+  const [bStatus, setBStatus] = useState<BrowserStatusResponse | null>(null);
+
+  const refreshBrowser = async () => {
+    try {
+      setBStatus(await api.browserStatus());
+    } catch {
+      /* ignore */
+    }
+  };
+  useEffect(() => {
+    if (open) void refreshBrowser();
+  }, [open]);
+
+  const startBrowser = async () => {
+    setBBusy(true);
+    setBMsg('正在启动浏览器服务…（首次需下载内核，请稍候并点“刷新状态”）');
+    try {
+      await api.updateSettings(form);
+      const st = await api.browserStart();
+      setBStatus(st);
+      setBMsg(st.message);
+    } catch (e) {
+      setBMsg(e instanceof Error ? e.message : '启动失败');
+    } finally {
+      setBBusy(false);
+    }
+  };
   const browserLogin = async () => {
     setBBusy(true);
-    setBMsg('正在打开浏览器…（首次启用需下载内核，可能要等一会）');
+    setBMsg('正在打开浏览器登录页…（若刚启用，需等内核下载/启动）');
     try {
       await api.updateSettings(form);
       const r = await api.browserLogin();
       setBMsg(r.message);
+      void refreshBrowser();
     } catch (e) {
       setBMsg(e instanceof Error ? e.message : '打开失败');
     } finally {
@@ -180,16 +208,15 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
           <Button variant="outline" className="text-xs" disabled={gBusy} onClick={connectGoogle}>
             {gBusy ? '授权中…' : '连接 Google（开始授权）'}
           </Button>
-          {gMsg &&
-            (gStatus === 'connected' ? (
-              <span className="rounded-full bg-[#22c55e]/15 px-2 py-0.5 text-[11px] font-medium text-[#4ade80] ring-1 ring-inset ring-[#22c55e]/40">
-                {gMsg}
-              </span>
-            ) : (
-              <span className={cn('text-[11px]', gStatus === 'error' ? 'text-danger' : 'text-muted')}>
-                {gMsg}
-              </span>
-            ))}
+          {gStatus === 'connected' || (gStatus === 'idle' && s?.googleConnected) ? (
+            <span className="rounded-full bg-[#22c55e]/15 px-2 py-0.5 text-[11px] font-medium text-[#4ade80] ring-1 ring-inset ring-[#22c55e]/40">
+              Google 已连接，可直接使用
+            </span>
+          ) : gMsg ? (
+            <span className={cn('text-[11px]', gStatus === 'error' ? 'text-danger' : 'text-muted')}>
+              {gMsg}
+            </span>
+          ) : null}
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="主代理模型">
@@ -250,16 +277,34 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
               onChange={(e) => setForm((f) => ({ ...f, enableBrowser: e.target.checked }))}
             />
             启用 cloakbrowser（浏览器自动化）
-            <span className="text-[11px] text-muted/60">· 启用后重启生效，首次会自动下载内核</span>
+            {bStatus &&
+              (bStatus.serving ? (
+                <span className="rounded-full bg-[#22c55e]/15 px-2 py-0.5 text-[10px] font-medium text-[#4ade80] ring-1 ring-inset ring-[#22c55e]/40">
+                  运行中 :9222
+                </span>
+              ) : (
+                <span className="rounded-full bg-border px-2 py-0.5 text-[10px] text-muted">未运行</span>
+              ))}
           </label>
-          <div className="flex items-center gap-3">
-            <Button variant="outline" className="text-xs" disabled={bBusy} onClick={browserLogin}>
-              {bBusy ? '打开中…' : '打开浏览器登录账号并保存'}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" className="text-xs" disabled={bBusy} onClick={startBrowser}>
+              {bBusy ? '处理中…' : '启动/重启浏览器服务'}
             </Button>
-            {bMsg && <span className="text-[11px] text-muted">{bMsg}</span>}
+            <Button variant="outline" className="text-xs" disabled={bBusy} onClick={browserLogin}>
+              打开浏览器登录账号
+            </Button>
+            <Button variant="ghost" className="text-xs" onClick={refreshBrowser}>
+              刷新状态
+            </Button>
           </div>
+          {bMsg && <p className="text-[11px] text-muted">{bMsg}</p>}
+          {bStatus && bStatus.logs.length > 0 && (
+            <pre className="max-h-32 overflow-y-auto rounded-md border border-border bg-panel2 p-2 text-[10px] leading-relaxed text-muted/80">
+              {bStatus.logs.join('\n')}
+            </pre>
+          )}
           <p className="text-[11px] text-muted/60">
-            登录态保存在持久化 profile，agent 调用 cloakbrowser 时自动复用，可访问需登录的网站。
+            cloakserve 是单一持久化浏览器（127.0.0.1:9222）：在它的窗口里登录账号会持久保存，agent 直接复用。
           </p>
         </div>
 
