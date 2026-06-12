@@ -108,8 +108,12 @@ export interface AgentRunDTO {
   sessionId: string;
   /** "main" for the orchestrator, otherwise the sub-agent name. */
   name: string;
+  /** main: the task title; sub-agent: its short task description. */
+  title: string | null;
   status: AgentRunStatus;
+  /** Short category tag of the current tool use (e.g. 浏览器, 联网搜索, 编辑). */
   currentTool: string | null;
+  /** Human-friendly one-line description of the current activity. */
   currentActivity: string | null;
   tokens: number;
   startedAt: string | null;

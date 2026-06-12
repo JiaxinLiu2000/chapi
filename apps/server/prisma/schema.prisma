@@ -63,6 +63,7 @@ model AgentRun {
   sessionId       String
   session         Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   name            String // "main" or sub-agent name
+  title           String?   @db.VarChar(300) // main: task title; sub: short task description
   status          String    @default("running") // idle|running|done|error|interrupted
   currentTool     String?
   currentActivity String?   @db.Text

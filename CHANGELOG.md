@@ -4,6 +4,18 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.10
+
+- Monitoring card overhaul:
+  - Main agent shows a **simple task title** (the session task), not raw tool JSON.
+  - Sub-agents get a **short task description** the moment they start (captured from the Task call).
+  - **Hard-coded per-tool activity detection** → a colored **tag chip** + concise one-line label in
+    each agent's status (read/edit/command/search/browser/Google/Wiki/PDF/ask/approve…).
+  - **WebSearch (Anthropic)** and **cloakbrowser browsing** are labeled distinctly
+    ("联网搜索(Anthropic)" vs "浏览器(cloakbrowser)").
+  - Verified live: main agent title + tags 找工具 / 抓取网页 instead of JSON.
+- Fix: footer version was stale (0.1.7); `APP_VERSION` now tracks releases again.
+
 ## v0.1.9
 
 - **cloakbrowser integration (auto-managed)**: new "启用 cloakbrowser" setting; the platform

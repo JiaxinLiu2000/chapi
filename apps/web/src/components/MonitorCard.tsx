@@ -20,30 +20,98 @@ const runStateColor: Record<string, string> = {
   error: 'bg-danger',
 };
 
-function AgentRow({ a }: { a: AgentRunDTO }) {
+// hard-coded tag -> color tone (matches server describeActivity tags)
+const TAG_TONE: Record<string, { bg: string; fg: string }> = {
+  读取: { bg: '#1e3a5f', fg: '#7cc4ff' },
+  检索: { bg: '#1e3a5f', fg: '#7cc4ff' },
+  查找: { bg: '#1e3a5f', fg: '#7cc4ff' },
+  列目录: { bg: '#1e3a5f', fg: '#7cc4ff' },
+  查Wiki: { bg: '#1e3a5f', fg: '#7cc4ff' },
+  查文档: { bg: '#1e3a5f', fg: '#7cc4ff' },
+  找工具: { bg: '#1e3a5f', fg: '#7cc4ff' },
+  写入: { bg: '#4a3410', fg: '#f5b955' },
+  编辑: { bg: '#4a3410', fg: '#f5b955' },
+  写Wiki: { bg: '#4a3410', fg: '#f5b955' },
+  PDF: { bg: '#4a3410', fg: '#f5b955' },
+  交付: { bg: '#4a3410', fg: '#f5b955' },
+  命令: { bg: '#3a2a4f', fg: '#c89bf5' },
+  联网搜索: { bg: '#0e3b3b', fg: '#5fe3d0' },
+  抓取网页: { bg: '#0e3b3b', fg: '#5fe3d0' },
+  浏览器: { bg: '#10402a', fg: '#5fe39a' },
+  Google: { bg: '#4a1f1f', fg: '#ff8a8a' },
+  Canva: { bg: '#4a1f3a', fg: '#ff8ad0' },
+  提问: { bg: '#2f2a5f', fg: '#a9a0ff' },
+  审批: { bg: '#2f2a5f', fg: '#a9a0ff' },
+  通知: { bg: '#2f2a5f', fg: '#a9a0ff' },
+  规划: { bg: '#2a3340', fg: '#9db4cc' },
+  子任务: { bg: '#2a3340', fg: '#9db4cc' },
+};
+
+function TagChip({ tag }: { tag: string }) {
+  const tone = TAG_TONE[tag] ?? { bg: '#2a2a33', fg: '#b9b9c4' };
   return (
-    <div className="rounded-lg border border-border bg-panel2 p-2">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-sm font-medium">
-          <Cpu size={13} className="text-muted" />
-          {a.name === 'main' ? '主代理' : a.name}
+    <span
+      className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium"
+      style={{ backgroundColor: tone.bg, color: tone.fg }}
+    >
+      {tag}
+    </span>
+  );
+}
+
+function AgentRow({ a }: { a: AgentRunDTO }) {
+  const isMain = a.name === 'main';
+  const running = a.status === 'running';
+  return (
+    <div className="rounded-lg border border-border bg-panel2 p-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
+          <Cpu size={13} className={running ? 'text-success' : 'text-muted'} />
+          <span>{isMain ? '主代理' : '子代理'}</span>
+          {!isMain && <span className="truncate text-[10px] text-muted/60">{a.name}</span>}
         </div>
         <span
           className={cn(
-            'rounded-full px-1.5 py-0.5 text-[10px]',
-            a.status === 'running' ? 'bg-success/20 text-success' : 'bg-border text-muted',
+            'flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px]',
+            running ? 'bg-success/20 text-success' : 'bg-border text-muted',
           )}
         >
-          {a.status === 'running' ? '运行中' : a.status === 'interrupted' ? '已中断' : '已结束'}
+          {running && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" />}
+          {running ? '运行中' : a.status === 'interrupted' ? '已中断' : a.status === 'error' ? '出错' : '已结束'}
         </span>
       </div>
-      {a.currentTool && (
-        <div className="mt-1 text-xs text-muted">
-          🔧 {a.currentTool}
-          {a.currentActivity ? `: ${a.currentActivity}` : ''}
+
+      {a.title && (
+        <div className="mt-1 line-clamp-2 text-xs leading-snug text-text/90" title={a.title}>
+          {a.title}
         </div>
       )}
-      {a.elapsedMs > 0 && <div className="mt-0.5 text-[11px] text-muted/70">{formatDuration(a.elapsedMs)}</div>}
+
+      {running && a.currentTool ? (
+        <div className="mt-1.5 flex items-center gap-1.5">
+          <TagChip tag={a.currentTool} />
+          {a.currentActivity && (
+            <span className="truncate text-[11px] text-muted" title={a.currentActivity}>
+              {a.currentActivity}
+            </span>
+          )}
+        </div>
+      ) : null}
+
+      <div className="mt-1.5 flex items-center gap-3 text-[10px] text-muted/60">
+        {a.elapsedMs > 0 && (
+          <span className="flex items-center gap-1">
+            <Clock size={10} />
+            {formatDuration(a.elapsedMs)}
+          </span>
+        )}
+        {a.tokens > 0 && (
+          <span className="flex items-center gap-1">
+            <Coins size={10} />
+            {formatTokens(a.tokens)}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { bus } from '../gateway/bus.js';
 import { createLogger } from '../logger.js';
 import { toAgentRunDTO, toPlanTaskDTO, toToolCallDTO } from '../mappers.js';
 import { preview } from './content.js';
+import { describeActivity } from './activity.js';
 
 const log = createLogger('monitoring');
 
@@ -30,20 +31,23 @@ export class RunMonitor {
   private tools = new Map<string, string>();
   /** AgentRun.id -> start epoch ms */
   private agentStart = new Map<string, number>();
+  /** subagent_type -> queued short task descriptions captured from Task calls */
+  private pendingSubagentDesc = new Map<string, string[]>();
 
   constructor(private readonly sessionId: string) {}
 
-  async ensureMainAgent(): Promise<string> {
-    return this.ensureAgent('main', 'main');
+  async ensureMainAgent(title?: string): Promise<string> {
+    return this.ensureAgent('main', 'main', title);
   }
 
-  private async ensureAgent(key: string, name: string): Promise<string> {
+  private async ensureAgent(key: string, name: string, title?: string): Promise<string> {
     const cached = this.agents.get(key);
     if (cached) return cached;
     const run = await prisma.agentRun.create({
       data: {
         sessionId: this.sessionId,
         name,
+        title: title ?? null,
         status: 'running',
         startedAt: new Date(),
       },
@@ -60,7 +64,9 @@ export class RunMonitor {
   }
 
   async onSubagentStart(input: SubagentStartHookInput): Promise<void> {
-    await this.ensureAgent(input.agent_id, input.agent_type || input.agent_id);
+    const queue = this.pendingSubagentDesc.get(input.agent_type);
+    const title = queue && queue.length ? queue.shift() : undefined;
+    await this.ensureAgent(input.agent_id, input.agent_type || input.agent_id, title);
   }
 
   async onSubagentStop(input: SubagentStopHookInput): Promise<void> {
@@ -85,6 +91,20 @@ export class RunMonitor {
     const name = input.agent_id ? input.agent_type || input.agent_id : 'main';
     const agentRunId = await this.ensureAgent(key, name);
     const inputPreview = preview(input.tool_input);
+    const { tag, label } = describeActivity(input.tool_name, input.tool_input);
+
+    // When the main thread dispatches a sub-agent, stash its short description so
+    // the sub-agent shows a task title the moment it starts.
+    if (input.tool_name === 'Task' && !input.agent_id) {
+      const ti = input.tool_input as { description?: string; subagent_type?: string } | null;
+      const desc = ti?.description?.trim();
+      const type = ti?.subagent_type?.trim() || 'general-purpose';
+      if (desc) {
+        const q = this.pendingSubagentDesc.get(type) ?? [];
+        q.push(desc);
+        this.pendingSubagentDesc.set(type, q);
+      }
+    }
 
     const call = await prisma.toolCall.create({
       data: {
@@ -99,7 +119,7 @@ export class RunMonitor {
 
     await prisma.agentRun.update({
       where: { id: agentRunId },
-      data: { currentTool: input.tool_name, currentActivity: inputPreview, status: 'running' },
+      data: { currentTool: tag, currentActivity: label, status: 'running' },
     });
 
     bus.emit({ type: 'tool.started', sessionId: this.sessionId, toolCall: toToolCallDTO(call) });

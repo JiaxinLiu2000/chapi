@@ -88,6 +88,7 @@ export function toAgentRunDTO(a: AgentRun): AgentRunDTO {
     id: a.id,
     sessionId: a.sessionId,
     name: a.name,
+    title: a.title,
     status: a.status as AgentRunDTO['status'],
     currentTool: a.currentTool,
     currentActivity: a.currentActivity,

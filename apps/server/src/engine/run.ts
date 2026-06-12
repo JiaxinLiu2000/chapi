@@ -118,7 +118,7 @@ export class Run {
       abortController: this.abort,
     });
 
-    await this.monitor.ensureMainAgent();
+    await this.monitor.ensureMainAgent(session.title);
     this.q = this.queryFn({ prompt: this.input, options });
     this.loop = this.consume();
     void this.loop;
