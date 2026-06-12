@@ -42,7 +42,8 @@ export async function connectGoogle(): Promise<GoogleConnectResponse> {
           google_workspace: {
             type: 'stdio',
             command: 'uvx',
-            args: ['workspace-mcp', '--tool-tier', 'core'],
+            // keep in sync with mcpRegistry: 'extended' exposes Gmail drafts
+            args: ['workspace-mcp', '--tool-tier', 'extended'],
             env: {
               GOOGLE_OAUTH_CLIENT_ID: g.clientId,
               GOOGLE_OAUTH_CLIENT_SECRET: g.clientSecret,

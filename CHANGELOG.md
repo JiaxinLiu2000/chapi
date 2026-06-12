@@ -4,6 +4,16 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.20
+
+- Enable **Gmail drafts**: launch `google_workspace_mcp` with `--tool-tier extended` (in both
+  mcpRegistry and the OAuth probe) so `draft_gmail_message` is registered — `core` lacked it.
+- Harden the never-send rule for the extended tier: `looksLikeGmailSend` now blocks
+  **send/forward/reply** Gmail tools (not just "send"), and `forward_gmail_message` is added to the
+  disallowed list. Drafting stays allowed.
+- Skills: document Gmail drafts (extended tier) + Apps Script automation in the Google Workspace
+  skill and the skills index.
+
 ## v0.1.19
 
 - **Auto-open the 实时浏览器 panel** when the agent uses a browser tool: the server emits a

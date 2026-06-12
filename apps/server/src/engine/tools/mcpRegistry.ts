@@ -45,7 +45,9 @@ export async function buildExternalMcpServers(): Promise<Record<string, McpServe
       servers.google_workspace = {
         type: 'stdio',
         command: 'uvx',
-        args: ['workspace-mcp', '--tool-tier', 'core'],
+        // 'extended' tier so Gmail's draft_gmail_message is registered (it's not in
+        // 'core'). Sending is still blocked by permissions.ts + disallowedToolsFor.
+        args: ['workspace-mcp', '--tool-tier', 'extended'],
         env: {
           GOOGLE_OAUTH_CLIENT_ID: google.clientId,
           GOOGLE_OAUTH_CLIENT_SECRET: google.clientSecret,

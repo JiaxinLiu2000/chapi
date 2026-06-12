@@ -17,7 +17,9 @@ function isInside(child: string, parent: string): boolean {
 
 function looksLikeGmailSend(toolName: string): boolean {
   const n = toolName.toLowerCase();
-  return n.includes('send') && (n.includes('gmail') || n.includes('mail') || n.includes('message'));
+  // Block anything that delivers mail (send / forward / reply), not just "send".
+  const delivers = n.includes('send') || n.includes('forward') || n.includes('reply');
+  return delivers && (n.includes('gmail') || n.includes('mail') || n.includes('message'));
 }
 
 /**
@@ -37,7 +39,10 @@ export function buildCanUseTool(
     // Gmail send is never allowed, regardless of profile.
     if (looksLikeGmailSend(toolName)) {
       log.warn(`blocked gmail-send-like tool: ${toolName}`);
-      return { behavior: 'deny', message: 'Sending email is disabled. Create a draft instead.' };
+      return {
+        behavior: 'deny',
+        message: 'Sending/forwarding/replying email is disabled. Create a draft instead.',
+      };
     }
 
     if (profile === 'vscode') {
@@ -76,5 +81,6 @@ export function disallowedToolsFor(profile: PermissionProfile): string[] {
     'mcp__google_workspace__send_gmail_message',
     'mcp__google_workspace__send_message',
     'mcp__google_workspace__reply_to_gmail_message',
+    'mcp__google_workspace__forward_gmail_message',
   ];
 }
