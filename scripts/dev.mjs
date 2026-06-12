@@ -98,6 +98,14 @@ async function main() {
     env: { ...process.env, DATABASE_URL },
   });
 
+  // A leftover `next build` (production) cache breaks `next dev` ("Cannot find
+  // module './NNN.js'"). BUILD_ID only exists for production builds — clear it.
+  const webNext = path.join(root, 'apps', 'web', '.next');
+  if (fs.existsSync(path.join(webNext, 'BUILD_ID'))) {
+    tag('web', 'clearing stale production .next cache…');
+    fs.rmSync(webNext, { recursive: true, force: true });
+  }
+
   tag('run', 'starting backend (:8123) and frontend (:3100)…');
   start('server', ['--filter', '@chapi/server', 'dev'], '\x1b[36m');
   start('web', ['--filter', '@chapi/web', 'dev'], '\x1b[35m');

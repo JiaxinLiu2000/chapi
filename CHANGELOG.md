@@ -4,6 +4,13 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.5
+
+- Fix: stale production `.next` cache (from `next build`) crashed `next dev` with
+  "Cannot find module './NNN.js'". The launcher now detects a leftover production build
+  (`.next/BUILD_ID`) and clears `apps/web/.next` before starting dev. Verified `/` and
+  `/wiki` render 200 with a fresh cache.
+
 ## v0.1.4
 
 - Settings: saved secret fields (OpenAI key, Google OAuth Client ID & Secret) now show a
