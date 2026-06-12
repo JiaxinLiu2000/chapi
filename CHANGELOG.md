@@ -4,6 +4,17 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.21
+
+- Left monitor bar is now **collapsible** (click the edge to collapse/expand; remembered in
+  localStorage).
+- **Draggable divider** between the chat and the live browser panel to adjust their proportions.
+- Revert the separate sub-agent model selector — **main and sub-agent now use one model**
+  (the single 模型 selector in the chat top bar; summaries/consolidation use it too).
+- Rename the completion button to **归档**.
+- Hide the **🌐 实时浏览器** toggle while the panel is open (the panel has its own close button);
+  it reappears after closing.
+
 ## v0.1.20
 
 - Enable **Gmail drafts**: launch `google_workspace_mcp` with `--tool-tier extended` (in both

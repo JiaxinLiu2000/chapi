@@ -79,7 +79,7 @@ ${artifactsText}
 ${transcript}`;
 
   try {
-    const out = await complete({ system, prompt, model: session?.subagentModel || undefined });
+    const out = await complete({ system, prompt, model: session?.model || undefined });
     const entries = JSON.parse(extractJsonArray(out)) as ProposedEntry[];
     let n = 0;
     for (const e of entries) {

@@ -7,15 +7,12 @@ import { getSocket } from '@/lib/ws';
  * Right-side live view of the agent's cloakbrowser (CDP screencast frames),
  * forming a left/right split with the chat. Read-only — you watch the agent.
  */
-export function BrowserPanel({ sessionId }: { sessionId: string }) {
-  const on = useStore((s) => s.browserViewOn);
+export function BrowserPanel({ sessionId, width }: { sessionId: string; width: number }) {
   const frame = useStore((s) => s.browserFrame);
   const url = useStore((s) => s.browserUrl);
   const status = useStore((s) => s.browserStatus);
   const message = useStore((s) => s.browserMessage);
   const setOn = useStore((s) => s.setBrowserViewOn);
-
-  if (!on) return null;
 
   const close = () => {
     setOn(false);
@@ -23,7 +20,10 @@ export function BrowserPanel({ sessionId }: { sessionId: string }) {
   };
 
   return (
-    <div className="flex w-[44%] min-w-[360px] flex-col border-l border-border bg-panel/30">
+    <div
+      className="flex shrink-0 flex-col border-l border-border bg-panel/30"
+      style={{ width }}
+    >
       <div className="flex items-center gap-2 border-b border-border px-3 py-2">
         <span className="text-xs font-medium text-muted">🌐 实时浏览器</span>
         <span

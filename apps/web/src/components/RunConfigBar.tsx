@@ -18,19 +18,14 @@ export function RunConfigBar({ sessionId }: { sessionId: string }) {
   const session = useStore((s) => s.session);
   const completed = session?.status === 'completed';
   const model = session?.model ?? '';
-  const subagentModel = session?.subagentModel ?? model;
   const effort: EffortLevel = session?.effort ?? 'high';
 
-  const patch = (partial: { model?: string; subagentModel?: string; effort?: EffortLevel }) =>
+  const patch = (partial: { model?: string; effort?: EffortLevel }) =>
     useStore.setState((s) => ({ session: s.session ? { ...s.session, ...partial } : s.session }));
 
   const onModel = (value: string) => {
     patch({ model: value });
     getSocket().send({ type: 'set.config', sessionId, model: value });
-  };
-  const onSubModel = (value: string) => {
-    patch({ subagentModel: value });
-    getSocket().send({ type: 'set.config', sessionId, subagentModel: value });
   };
   const onEffort = (value: EffortLevel) => {
     patch({ effort: value });
@@ -51,30 +46,15 @@ export function RunConfigBar({ sessionId }: { sessionId: string }) {
 
   return (
     <div className="flex items-center gap-2 border-b border-border bg-panel/40 px-4 py-2">
-      <span className="text-xs text-muted">主模型</span>
+      <span className="text-xs text-muted">模型</span>
       <select
         className={selectCls}
         value={model}
         disabled={completed}
         onChange={(e) => onModel(e.target.value)}
-        title="主代理模型（即时生效）"
+        title="模型（主代理与子代理统一使用，即时生效）"
       >
         {optionsFor(model).map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.label}
-          </option>
-        ))}
-      </select>
-
-      <span className="ml-3 text-xs text-muted">子模型</span>
-      <select
-        className={selectCls}
-        value={subagentModel}
-        disabled={completed}
-        onChange={(e) => onSubModel(e.target.value)}
-        title="子代理 / 摘要与复盘所用模型"
-      >
-        {optionsFor(subagentModel).map((m) => (
           <option key={m.id} value={m.id}>
             {m.label}
           </option>
@@ -96,18 +76,16 @@ export function RunConfigBar({ sessionId }: { sessionId: string }) {
         ))}
       </select>
 
-      <button
-        className={
-          'ml-auto rounded-md border px-2 py-1 text-xs ' +
-          (browserOn
-            ? 'border-accent/40 bg-accent/15 text-text'
-            : 'border-border text-muted hover:text-text')
-        }
-        onClick={toggleBrowser}
-        title="在右侧实时显示 agent 的浏览器画面"
-      >
-        🌐 实时浏览器
-      </button>
+      {/* hidden while the panel is open (the panel has its own close button) */}
+      {!browserOn && (
+        <button
+          className="ml-auto rounded-md border border-border px-2 py-1 text-xs text-muted hover:text-text"
+          onClick={toggleBrowser}
+          title="在右侧实时显示 agent 的浏览器画面"
+        >
+          🌐 实时浏览器
+        </button>
+      )}
     </div>
   );
 }

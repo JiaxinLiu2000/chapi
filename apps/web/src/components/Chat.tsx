@@ -49,7 +49,7 @@ export function Chat({ sessionId }: { sessionId: string }) {
                 title="将此任务标记为出色完成：平台会学习并归档，之后该对话变为只读"
                 className="flex shrink-0 items-center gap-1.5 rounded-xl bg-success/90 px-3 py-2.5 text-xs font-medium text-white transition hover:bg-success"
               >
-                <CheckCircle2 size={15} /> 出色完成
+                <CheckCircle2 size={15} /> 归档
               </button>
             )}
           </div>

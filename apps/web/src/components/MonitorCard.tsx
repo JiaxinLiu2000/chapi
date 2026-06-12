@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { Activity, Clock, Coins, Cpu } from 'lucide-react';
+import { Activity, ChevronLeft, ChevronRight, Clock, Coins, Cpu } from 'lucide-react';
 import type { AgentRunDTO } from '@chapi/shared';
 import { useStore } from '@/lib/store';
 import { cn, formatCost, formatDuration, formatTokens } from '@/lib/utils';
@@ -158,8 +158,32 @@ export function MonitorCard() {
   const ticking = runState === 'running' && questions.length === 0 && approvals.length === 0;
   const liveMs = useLiveElapsed(usage?.activeMs ?? 0, ticking);
 
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    setCollapsed(localStorage.getItem('chapi:monitorCollapsed') === '1');
+  }, []);
+  const toggle = () =>
+    setCollapsed((c) => {
+      const next = !c;
+      localStorage.setItem('chapi:monitorCollapsed', next ? '1' : '0');
+      return next;
+    });
+
+  if (collapsed) {
+    return (
+      <aside
+        onClick={toggle}
+        title="展开监控"
+        className="hidden h-[calc(100vh-3.5rem)] w-6 shrink-0 cursor-pointer items-start justify-center border-r border-border bg-panel/50 pt-3 hover:bg-panel2 lg:flex"
+      >
+        <ChevronRight size={16} className="text-muted" />
+      </aside>
+    );
+  }
+
   return (
-    <aside className="hidden h-[calc(100vh-3.5rem)] w-72 shrink-0 overflow-y-auto border-r border-border bg-panel/50 p-3 lg:block">
+    <aside className="hidden h-[calc(100vh-3.5rem)] w-72 shrink-0 border-r border-border bg-panel/50 lg:flex">
+      <div className="flex-1 overflow-y-auto p-3">
       {/* status + stats */}
       <div className="rounded-xl border border-border bg-panel p-3">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
@@ -219,6 +243,15 @@ export function MonitorCard() {
           </div>
         </div>
       )}
+      </div>
+      {/* clickable edge to collapse */}
+      <div
+        onClick={toggle}
+        title="折叠监控"
+        className="flex w-3 shrink-0 cursor-pointer items-start justify-center border-l border-border pt-3 hover:bg-panel2"
+      >
+        <ChevronLeft size={14} className="text-muted/60" />
+      </div>
     </aside>
   );
 }
