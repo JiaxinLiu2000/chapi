@@ -145,12 +145,14 @@ export class RunMonitor {
     const id = this.agents.get(input.agent_id);
     if (!id) return;
     const start = this.agentStart.get(id) ?? Date.now();
+    const summary = (input.last_assistant_message ?? '').trim().slice(0, 500) || null;
     await prisma.agentRun.update({
       where: { id },
       data: {
         status: 'done',
         currentTool: null,
         currentActivity: null,
+        summary,
         endedAt: new Date(),
         elapsedMs: Date.now() - start,
       },

@@ -4,6 +4,22 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.34 — 子代理工作总结 + 并发浏览不再踩踏（单驱动锁 + 增量截屏）
+
+- **子代理工作总结**：子代理结束后，在监控里保留一段**工作总结**（取其最后一条 assistant 消息，
+  `SubagentStop.last_assistant_message`）。新增 `AgentRun.summary` 列 + DTO，监控卡片在子代理"已结束"时显示。
+- **修复并发浏览踩踏**（实测 4 个报错：goto 超时 / connect_over_cdp 180s 卡死 / TargetClosedError）。根因是
+  同一浏览器上有 3 个 CDP 客户端互相抢 target（截屏流 + 两个子代理的 connect_over_cdp）：
+  - **截屏改增量 + 防抖**（`browserView.ts`）：不再"集合一变就全量拆了重连"，改为只对**新增** target 连接、
+    对**消失**的单独关闭，不动未变的 pane；且新 target 需稳定一个轮询周期才接入，避开 agent 正在创建/导航
+    的竞态窗口（消除 TargetClosedError 与 2→1 闪断）。
+  - **跨进程 CDP 锁**（`chapi_browser.py`）：同一时刻只允许一个脚本驱动 cloakbrowser，第二个**自动排队**
+    （崩溃残留锁按心跳超时夺取）。两个子代理各开网站仍可跑，但**串行**不再卡死握手。
+  - **连接更稳健**：`connect_over_cdp` 超时从 180s 降到 30s + 有限重试。
+- **同时浏览两个页面的正确姿势**：在**同一个脚本/连接**里用 `new_tab(ctx, url)` 多开第二个标签（最多 2，
+  实时浏览器上下分屏）；不要派两个子代理各自连浏览器。提示词与 web-research/batch-scripting 技能同步更新。
+  （澄清：之前"new_page 无法导航"是并发踩踏所致，单驱动下多标签正常。）
+
 ## v0.1.33 — "Claude 调用"实时计数（不再一直是 0）
 
 - **问题**：v0.1.32 的"Claude 调用"只在每轮**结束**（`result`）时才 +1，所以任务进行中、或一轮被中断/

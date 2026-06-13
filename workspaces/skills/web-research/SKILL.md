@@ -10,7 +10,7 @@
 循环猛刷，都会被封——而且其挑战脚本会把浏览器 CPU 拖满，导致**整个 cloakbrowser 卡死/打不开页面**。
 所以无论**探索**还是**写脚本**，都必须：
 1. **始终经 cloakbrowser**：用沙盘里的 `chapi_browser` 接管正在运行的浏览器；**不要另起浏览器、不要裸 requests/httpx**。
-2. **复用默认页，别 `new_page()`**：`open_page()`/`connect()` 已复用 `ctx.pages[0]`。经 CDP 新开的页面**无法导航**（goto 卡到超时，连 example.com 都打不开）；复用默认页则秒开。
+2. **单驱动**：同一时刻只允许一个脚本驱动浏览器（已加跨进程 CDP 锁，多个会自动排队）。单页复用 `ctx.pages[0]`；要同时看两页就在**一个连接**里 `new_tab`（最多 2）。别用两个独立脚本/子代理同时连。
 3. **动作间随机停顿** + 滚动 + 移动鼠标：用 `human_goto / human_click / human_scroll / human_pause / human_type`，别瞬间连点。
 4. **顺网站路径走**：先 `warmup`/打开首页或列表/搜索页，再 **点进** 详情页；**绝不直接 goto 深层详情 URL**。
 5. **翻页点"下一页"按钮**：用 `click_next(page)`，**别拼 `?page=2` 冷跳**。
@@ -41,15 +41,31 @@ with open_page() as page:                      # 新开一个页面（会显示�
 运行：`uv run --with playwright python research.py`
 （connect_over_cdp 只需 `playwright` 包，**不需要** `playwright install`。）
 
-## 用 connect（复用默认页）
+## 单驱动模型（重要）
+**同一时刻只能有一个脚本驱动 cloakbrowser。** `connect()`/`open_page()` 已加**跨进程 CDP 锁**：
+两个子代理同时连会自动**排队串行**，不再握手踩踏卡死。所以：
+- 单页任务：`open_page()` 或 `connect()` + `active_page(ctx)`（复用 `ctx.pages[0]`）。
+- **不要**为了"并行抓"派两个子代理各自连浏览器——它们会排队，反而更慢。真要并行只用于**不同任务**，且其中最多一个用浏览器。
+
+## 用 connect（复用默认页 + 可多开标签）
 ```python
-from chapi_browser import connect, active_page, human_pause
-with connect() as ctx:            # 持久化 profile（含登录态）
-    page = active_page(ctx)       # = ctx.pages[0]，复用默认页（别 new_page）
+from chapi_browser import connect, active_page, new_tab, human_pause
+with connect() as ctx:            # 持久化 profile（含登录态），全程持有 CDP 锁
+    page = active_page(ctx)       # = ctx.pages[0]，复用默认页
     # ...拟人交互，循环里 human_pause()...
-    # 不要 ctx.close()/browser.close()；结束后可 page.goto("about:blank") 让实时浏览器回到空白
+    # 不要 ctx.close()/browser.close()
 ```
-- 浏览器任务**顺序执行**最稳；CDP 下多页/并发不可靠（新页面无法导航），不要靠开多页提速。
+
+## 同时浏览两个页面（在同一连接里开第二个标签）
+```python
+from chapi_browser import connect, active_page, new_tab, human_goto, human_pause
+with connect() as ctx:
+    a = active_page(ctx); human_goto(a, "https://site-a.com/")
+    b = new_tab(ctx, "https://site-b.com/")   # 第二个标签页（实时浏览器上下分屏，最多 2）
+    # 交替/并发操作 a、b 两页 ...
+    b.close()                      # 用完关掉额外标签；a 可 goto("about:blank")
+```
+（这是"同时看两个网页"的正确做法——一个脚本、一把锁、两个标签；不要两个脚本/子代理同时连。）
 
 ## 安全约定（别弄坏共享浏览器）
 - **绝不** `browser.close()` / `context.close()`（会断连、清空已开页面、拖垮实时浏览器）。

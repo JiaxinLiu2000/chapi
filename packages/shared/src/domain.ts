@@ -137,6 +137,8 @@ export interface AgentRunDTO {
   currentTool: string | null;
   /** Human-friendly one-line description of the current activity. */
   currentActivity: string | null;
+  /** Sub-agent work summary shown after it finishes (its last assistant message). */
+  summary: string | null;
   tokens: number;
   startedAt: string | null;
   endedAt: string | null;

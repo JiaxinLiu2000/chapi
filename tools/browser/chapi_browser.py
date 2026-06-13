@@ -1,9 +1,12 @@
 """
 chapi_browser — 用 cloakbrowser **像真人一样**浏览网页（over CDP）。
 
-⚠️ 关键：接管 cloakbrowser 时**复用它已有的持久化页面 `ctx.pages[0]`，不要 `new_page()`**。
-经 CDP 新开的页面无法正常导航（goto 会卡到超时，连 example.com 都打不开）；复用默认页则秒开。
-本模块的 `open_page()` / `connect()` 已经帮你复用默认页，照用即可。
+⚠️ 关键 1（单驱动）：**同一时刻只能有一个脚本驱动 cloakbrowser**。本模块对 `connect()`/`open_page()`
+加了**跨进程 CDP 锁**：两个子代理同时连会自动排队（不再握手踩踏卡死）。所以"两个子代理各开一个网站"
+能跑，但会**串行**。要真正"同时看两个页面"，请在**同一个脚本/连接**里用 `new_tab()` 多开（最多 2 个）。
+
+⚠️ 关键 2（复用默认页）：单页任务复用 `ctx.pages[0]`（`active_page(ctx)` / `open_page()` 已帮你做）。
+之前"新开页面无法导航"是并发踩踏所致，单驱动下 `new_tab()` 正常。
 
 ⚠️ 反爬（Akamai/PerimeterX 等）主要靠**行为**识别：
   1. **始终经 cloakbrowser**（本模块即接管运行中的 cloakbrowser，别另起浏览器、别裸 requests）。
@@ -40,6 +43,8 @@ from __future__ import annotations
 import asyncio
 import os
 import random
+import tempfile
+import threading
 import time
 from contextlib import asynccontextmanager, contextmanager
 
@@ -51,6 +56,99 @@ _NO_CONTEXT_MSG = (
     "不要在脚本里 browser.close() 或 context.close()。"
 )
 _BLANK = "about:blank"
+_CONNECT_TIMEOUT_MS = 30000  # 别用 Playwright 默认的 180s——失败要快、好重试
+_LOCK_STALE_S = 90           # 锁持有者每 30s 心跳；超过这个没动静视为崩溃残留
+
+
+def _lock_path() -> str:
+    """所有 chapi_browser 进程共享的同一把锁文件（按 CDP 端口区分）。"""
+    p = os.environ.get("CHAPI_BROWSER_LOCK")
+    if p:
+        return p
+    port = CDP_ENDPOINT.rsplit(":", 1)[-1].split("/")[0] or "9222"
+    return os.path.join(tempfile.gettempdir(), f"chapi-cdp-{port}.lock")
+
+
+class _CdpLock:
+    """跨进程文件锁：同一时刻只允许一个 CDP 驱动会话连 cloakbrowser，其余排队。
+
+    解决并发踩踏——两个子代理同时 connect_over_cdp 会卡死握手。拿不到锁就阻塞等待，
+    崩溃残留的锁通过心跳时间戳自动判定为过期并夺取。
+    """
+
+    def __init__(self) -> None:
+        self.path = _lock_path()
+        self.fd: int | None = None
+        self._stop: threading.Event | None = None
+
+    def acquire(self, timeout_s: float = 600.0) -> None:
+        deadline = time.time() + timeout_s
+        while True:
+            try:
+                self.fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_RDWR)
+                os.write(self.fd, f"{os.getpid()} {time.time()}".encode())
+                self._start_heartbeat()
+                return
+            except FileExistsError:
+                try:
+                    if time.time() - os.path.getmtime(self.path) > _LOCK_STALE_S:
+                        os.remove(self.path)
+                        continue
+                except FileNotFoundError:
+                    continue
+                if time.time() > deadline:
+                    raise TimeoutError("另一个浏览器会话正持有 CDP 锁（等待超时）")
+                time.sleep(0.5)
+
+    def _start_heartbeat(self) -> None:
+        self._stop = threading.Event()
+        stop = self._stop
+        path = self.path
+
+        def beat() -> None:
+            while not stop.wait(30):
+                try:
+                    os.utime(path, None)
+                except Exception:
+                    pass
+
+        threading.Thread(target=beat, daemon=True).start()
+
+    def release(self) -> None:
+        if self._stop:
+            self._stop.set()
+        if self.fd is not None:
+            try:
+                os.close(self.fd)
+            except Exception:
+                pass
+            self.fd = None
+        try:
+            os.remove(self.path)
+        except Exception:
+            pass
+
+
+@contextmanager
+def _hold_lock():
+    lk = _CdpLock()
+    lk.acquire()
+    try:
+        yield
+    finally:
+        lk.release()
+
+
+def _connect_cdp(pw):
+    """connect_over_cdp + 短超时 + 有限重试（默认 180s 太慢）。"""
+    last: Exception | None = None
+    for attempt in range(3):
+        try:
+            return pw.chromium.connect_over_cdp(CDP_ENDPOINT, timeout=_CONNECT_TIMEOUT_MS)
+        except Exception as e:  # noqa: BLE001
+            last = e
+            time.sleep(1.0 * (attempt + 1))
+    raise last if last else RuntimeError("connect_over_cdp failed")
 
 
 # ───────────────────────── 拟人操作助手（同步） ─────────────────────────
@@ -186,21 +284,34 @@ def _pick_context(browser):
 
 
 def active_page(ctx):
-    """返回可用的默认页（复用 ctx.pages[0]）；没有才新建。**优先复用，别 new_page()。**"""
+    """返回可用的默认页（复用 ctx.pages[0]）；没有才新建。**单页任务优先复用。**"""
     return ctx.pages[0] if ctx.pages else ctx.new_page()
+
+
+def new_tab(ctx, url: str | None = None, *, wait_until: str = "domcontentloaded"):
+    """在**同一个连接**里多开一个标签页（同时浏览两个页面用，最多 2 个）。
+
+    ⚠️ 仅在**一个** chapi_browser 会话内安全（我们持有 CDP 锁、独占驱动）。**不要**用两个独立
+    脚本/子代理同时连浏览器开标签页——会握手踩踏。用完请 `page.close()` 关掉这个额外标签页。
+    """
+    page = ctx.new_page()
+    if url:
+        human_goto(page, url, wait_until=wait_until)
+    return page
 
 
 @contextmanager
 def connect(*, default_timeout_ms: int = 45000):
     """接管运行中的 cloakbrowser，产出持久化 BrowserContext（含登录态）。
 
-    在其中**复用 `ctx.pages[0]`**（用 `active_page(ctx)`）；CDP 下 `new_page()` 往往无法导航。
+    全程持有跨进程 **CDP 锁**（其他 chapi_browser 会话排队），所以这个 with 内可安全地
+    `active_page(ctx)` 复用默认页，或 `new_tab(ctx, url)` 多开 1 个标签页（最多 2）同时浏览两页。
     退出 with 只断开 CDP，不关 browser/context。
     """
     from playwright.sync_api import sync_playwright
 
-    with sync_playwright() as pw:
-        browser = pw.chromium.connect_over_cdp(CDP_ENDPOINT)
+    with _hold_lock(), sync_playwright() as pw:
+        browser = _connect_cdp(pw)
         ctx = _pick_context(browser)
         try:
             ctx.set_default_timeout(default_timeout_ms)
@@ -214,11 +325,12 @@ def open_page(url: str | None = None, *, wait_until: str = "domcontentloaded", t
     """复用 cloakbrowser 的默认页并产出该 Page。**退出时把页面导回空白页**（闲置即空白）。
 
     传 url 会用 human_goto 拟人打开（仅传**入口页**；详情页用 human_click 点进）。
+    需要同时看两个页面时，改用 `connect()` + `new_tab()`。
     """
     from playwright.sync_api import sync_playwright
 
-    with sync_playwright() as pw:
-        browser = pw.chromium.connect_over_cdp(CDP_ENDPOINT)
+    with _hold_lock(), sync_playwright() as pw:
+        browser = _connect_cdp(pw)
         ctx = _pick_context(browser)
         created = not ctx.pages
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
@@ -259,33 +371,38 @@ async def human_goto_async(page, url: str, *, wait_until: str = "domcontentloade
 
 @asynccontextmanager
 async def open_page_async(url: str | None = None, *, wait_until: str = "domcontentloaded", timeout_ms: int = 45000):
-    """open_page() 的异步版本（复用默认页；浏览器任务建议顺序执行，CDP 多页并发不可靠）。"""
+    """open_page() 的异步版本（复用默认页，持有 CDP 锁）。多标签同看请在同一脚本里开。"""
     from playwright.async_api import async_playwright
 
-    async with async_playwright() as pw:
-        browser = await pw.chromium.connect_over_cdp(CDP_ENDPOINT)
-        ctxs = browser.contexts
-        if not ctxs:
-            raise RuntimeError(_NO_CONTEXT_MSG)
-        ctx = ctxs[0]
-        created = not ctx.pages
-        page = ctx.pages[0] if ctx.pages else await ctx.new_page()
-        try:
-            page.set_default_timeout(timeout_ms)
-        except Exception:
-            pass
-        try:
-            if url:
-                await human_goto_async(page, url, wait_until=wait_until)
-            yield page
-        finally:
+    _lk = _CdpLock()
+    _lk.acquire()
+    try:
+        async with async_playwright() as pw:
+            browser = await pw.chromium.connect_over_cdp(CDP_ENDPOINT, timeout=_CONNECT_TIMEOUT_MS)
+            ctxs = browser.contexts
+            if not ctxs:
+                raise RuntimeError(_NO_CONTEXT_MSG)
+            ctx = ctxs[0]
+            created = not ctx.pages
+            page = ctx.pages[0] if ctx.pages else await ctx.new_page()
             try:
-                if created:
-                    await page.close()
-                else:
-                    await page.goto(_BLANK)
+                page.set_default_timeout(timeout_ms)
             except Exception:
                 pass
+            try:
+                if url:
+                    await human_goto_async(page, url, wait_until=wait_until)
+                yield page
+            finally:
+                try:
+                    if created:
+                        await page.close()
+                    else:
+                        await page.goto(_BLANK)
+                except Exception:
+                    pass
+    finally:
+        _lk.release()
 
 
 if __name__ == "__main__":

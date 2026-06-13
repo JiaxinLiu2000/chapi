@@ -6,6 +6,7 @@ import { settings } from '../secrets.js';
 
 const log = createLogger('browser-view');
 const HOST = '127.0.0.1';
+const DEFAULT_TARGET = '__default__';
 
 /** Minimal shape of the chrome-remote-interface client we use. */
 interface CdpClient {
@@ -23,6 +24,7 @@ interface Pane {
   targetId: string;
   client: CdpClient;
   url: string | null;
+  index: number; // slot/page index shown on the frontend (reassigned on diff)
 }
 
 /** Is cloakserve's CDP endpoint up? */
@@ -37,17 +39,26 @@ export async function cloakserveReachable(): Promise<boolean> {
   }
 }
 
+const sameIds = (a: string[], b: string[]): boolean =>
+  a.length === b.length && a.every((x, i) => x === b[i]);
+
 /**
  * Streams the live cloakbrowser screen to viewing sessions via CDP screencast.
- * Supports up to `maxBrowserPages` (1–2) page targets, each as a separate pane
- * (`browser.frame` with a page index). Connects on first viewer, disconnects on
- * last; periodically re-syncs which page targets are shown (open/close tabs).
+ * Shows up to `maxBrowserPages` (1–2) non-idle page targets, each as its own pane
+ * (`browser.frame` with a page index).
+ *
+ * Re-sync is **incremental + debounced**: it only attaches to NEW targets and
+ * closes GONE ones (never tears down unchanged panes), and a target must be stable
+ * for one poll before we attach to it. This avoids racing the agent's own
+ * `connect_over_cdp` driver while it creates/navigates tabs (which previously
+ * caused TargetClosedError and connection-handshake stomping under concurrency).
  */
 class BrowserViewManager {
   private viewers = new Set<string>();
   private panes: Pane[] = [];
-  private connecting = false;
+  private busy = false;
   private refresh: NodeJS.Timeout | null = null;
+  private lastSeenIds: string[] = []; // for debounce: target set from the previous poll
 
   async addViewer(sessionId: string): Promise<void> {
     this.viewers.add(sessionId);
@@ -67,6 +78,10 @@ class BrowserViewManager {
   removeViewer(sessionId: string): void {
     if (!this.viewers.delete(sessionId)) return;
     if (this.viewers.size === 0) void this.disconnectAll();
+  }
+
+  private emitStateToAll(status: 'connecting' | 'connected'): void {
+    for (const sid of this.viewers) this.emitStateTo(sid, status);
   }
 
   private emitStateTo(sessionId: string, status: 'connecting' | 'connected'): void {
@@ -97,7 +112,6 @@ class BrowserViewManager {
     return u === '' || u === 'about:blank' || u === 'about:newtab' || u.startsWith('chrome://new');
   }
 
-  /** Non-idle page targets (what we actually show), capped to maxPages. */
   private async activeTargets(maxPages: number): Promise<Array<{ id: string; url: string }>> {
     const all = await this.listPageTargets().catch(() => []);
     return all.filter((t) => !this.isIdleUrl(t.url)).slice(0, maxPages);
@@ -108,7 +122,7 @@ class BrowserViewManager {
   }
 
   private async ensureConnected(forSession: string): Promise<void> {
-    if (this.panes.length || this.connecting) return;
+    if (this.panes.length || this.busy) return;
     if (!(await cloakserveReachable())) {
       this.viewers.delete(forSession);
       bus.emit({
@@ -122,20 +136,19 @@ class BrowserViewManager {
       });
       return;
     }
-    this.connecting = true;
+    this.busy = true;
     try {
       const maxPages = await settings.getMaxBrowserPages();
       const targets = await this.activeTargets(maxPages);
+      this.lastSeenIds = targets.map((t) => t.id);
       if (targets.length === 0) {
-        // Nothing active yet — screencast the default target as pane 0 (resync will
-        // collapse it shortly if it stays blank).
-        await this.connectPane(0, undefined);
+        await this.connectPane(undefined); // show the current/default tab on open
       } else {
-        for (let i = 0; i < targets.length; i++) await this.connectPane(i, targets[i]?.id);
+        await this.syncPanes(targets);
       }
       log.info(`CDP screencast connected (${this.panes.length} pane(s))`);
     } catch (err) {
-      await this.disconnectPanes(); // drop any half-connected pane
+      await this.closeAllPanes();
       log.warn(`CDP connect failed: ${err instanceof Error ? err.message : String(err)}`);
       bus.emit({
         type: 'browser.state',
@@ -147,18 +160,39 @@ class BrowserViewManager {
         message: '连接 cloakbrowser 失败（CDP 未就绪）。',
       });
     } finally {
-      this.connecting = false;
+      this.busy = false;
     }
   }
 
-  private async connectPane(index: number, targetId: string | undefined): Promise<void> {
+  /** Reconcile shown panes to `desired` WITHOUT touching unchanged ones. */
+  private async syncPanes(desired: Array<{ id: string; url: string }>): Promise<void> {
+    const desiredIds = desired.map((t) => t.id);
+    // Close panes whose target is gone.
+    for (const pane of [...this.panes]) {
+      if (!desiredIds.includes(pane.targetId)) await this.closePane(pane);
+    }
+    // Attach to newly-appeared targets.
+    for (const t of desired) {
+      if (!this.panes.find((p) => p.targetId === t.id)) await this.connectPane(t.id);
+    }
+    // Order panes by desired order and reassign slot indices.
+    this.panes.sort((a, b) => desiredIds.indexOf(a.targetId) - desiredIds.indexOf(b.targetId));
+    this.panes.forEach((p, i) => (p.index = i));
+  }
+
+  private async connectPane(targetId: string | undefined): Promise<void> {
     const client = (await CDP({
       host: HOST,
       port: config.cloakbrowserCdpPort,
       ...(targetId ? { target: targetId } : {}),
     })) as unknown as CdpClient;
-    const pane: Pane = { targetId: targetId ?? `pane-${index}`, client, url: null };
-    this.panes[index] = pane;
+    const pane: Pane = {
+      targetId: targetId ?? DEFAULT_TARGET,
+      client,
+      url: null,
+      index: this.panes.length,
+    };
+    this.panes.push(pane);
     const { Page } = client;
     await Page.enable();
     client.on('Page.frameNavigated', (p: unknown) => {
@@ -168,21 +202,14 @@ class BrowserViewManager {
     client.on('Page.screencastFrame', (p: unknown) => {
       const f = p as { data: string; sessionId: number };
       for (const sid of this.viewers) {
-        bus.emit({ type: 'browser.frame', sessionId: sid, page: index, dataBase64: f.data, url: pane.url });
+        bus.emit({ type: 'browser.frame', sessionId: sid, page: pane.index, dataBase64: f.data, url: pane.url });
       }
       client.Page.screencastFrameAck({ sessionId: f.sessionId }).catch(() => undefined);
     });
     client.on('disconnect', () => {
-      for (const sid of this.viewers) {
-        bus.emit({
-          type: 'browser.state',
-          sessionId: sid,
-          page: index,
-          pageCount: this.panes.length || 1,
-          status: 'disconnected',
-          url: pane.url,
-        });
-      }
+      // A target the agent closed — drop the pane so the next poll re-diffs cleanly.
+      this.panes = this.panes.filter((x) => x !== pane);
+      this.panes.forEach((x, i) => (x.index = i));
     });
     // Keep the stream light: a heavy screencast competes for CPU with the page
     // itself (and anti-bot challenge JS is already CPU-hungry), which can make
@@ -196,53 +223,63 @@ class BrowserViewManager {
     });
   }
 
-  /** Periodically re-sync which page targets are shown (e.g. agent opened a 2nd tab). */
+  private async closePane(pane: Pane): Promise<void> {
+    this.panes = this.panes.filter((p) => p !== pane);
+    try {
+      await pane.client.Page.stopScreencast();
+    } catch {
+      /* ignore */
+    }
+    try {
+      await pane.client.close();
+    } catch {
+      /* ignore */
+    }
+  }
+
   private startRefresh(): void {
     if (this.refresh) return;
-    // Re-sync gently — frequent teardown/rebuild churns the browser, especially
-    // while a page is busy. 6s is responsive enough for new/closed tabs.
+    // Gentle cadence; combined with debounce a new tab appears ~6–12s after it opens.
     this.refresh = setInterval(() => void this.resync(), 6000);
   }
 
   private async resync(): Promise<void> {
-    if (this.viewers.size === 0 || this.connecting) return;
+    if (this.viewers.size === 0 || this.busy) return;
     if (!(await cloakserveReachable())) return;
-    const maxPages = await settings.getMaxBrowserPages();
-    const targets = await this.activeTargets(maxPages);
-    // All pages idle/blank → the agent stopped browsing. Stop streaming and ask
-    // the clients to auto-collapse the live browser panel.
-    if (targets.length === 0) {
-      if (this.panes.length) await this.disconnectPanes();
-      this.hideForAllViewers();
-      return;
-    }
-    const wantIds = targets.map((t) => t.id);
-    const haveIds = this.panes.map((p) => p.targetId);
-    // Rebuild only if the set of shown (active) targets changed — this is also how
-    // 2 panes drop to 1 when one tab goes blank.
-    const changed =
-      wantIds.length !== haveIds.length || wantIds.some((id, i) => id !== haveIds[i]);
-    if (!changed) return;
-    await this.disconnectPanes();
-    await this.ensureConnectedFresh(targets);
-    const sid = [...this.viewers][0];
-    if (sid) this.emitStateTo(sid, this.panes.length ? 'connected' : 'connecting');
-  }
-
-  private async ensureConnectedFresh(targets: Array<{ id: string; url: string }>): Promise<void> {
-    // like ensureConnected but assumes reachable + not guarded by existing panes
-    this.connecting = true;
+    this.busy = true;
     try {
-      for (let i = 0; i < targets.length; i++) await this.connectPane(i, targets[i]?.id);
+      const maxPages = await settings.getMaxBrowserPages();
+      const desired = await this.activeTargets(maxPages);
+      const desiredIds = desired.map((t) => t.id);
+
+      // All pages idle/blank → the agent stopped browsing. Collapse the panel.
+      if (desiredIds.length === 0) {
+        if (this.panes.length) await this.closeAllPanes();
+        this.lastSeenIds = [];
+        this.hideForAllViewers();
+        return;
+      }
+
+      // Debounce: only act once a target set has been stable for one poll. This
+      // avoids attaching to a tab the agent is still creating/navigating (the race
+      // that caused TargetClosedError).
+      const stable = sameIds(desiredIds, this.lastSeenIds);
+      this.lastSeenIds = desiredIds;
+      if (!stable) return;
+
+      const haveIds = this.panes.map((p) => p.targetId);
+      if (sameIds(desiredIds, haveIds)) return; // nothing changed
+
+      await this.syncPanes(desired);
+      this.emitStateToAll('connected');
     } catch (err) {
-      await this.disconnectPanes(); // drop half-connected panes so the next resync starts clean
-      log.warn(`CDP resync connect failed: ${err instanceof Error ? err.message : String(err)}`);
+      log.warn(`CDP resync failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
-      this.connecting = false;
+      this.busy = false;
     }
   }
 
-  private async disconnectPanes(): Promise<void> {
+  private async closeAllPanes(): Promise<void> {
     const panes = this.panes;
     this.panes = [];
     for (const p of panes) {
@@ -264,7 +301,8 @@ class BrowserViewManager {
       clearInterval(this.refresh);
       this.refresh = null;
     }
-    await this.disconnectPanes();
+    this.lastSeenIds = [];
+    await this.closeAllPanes();
     log.info('CDP screencast disconnected');
   }
 }

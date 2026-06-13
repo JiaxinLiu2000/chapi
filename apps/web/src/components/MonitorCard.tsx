@@ -150,6 +150,17 @@ function AgentRow({ a, currentStage }: { a: AgentRunDTO; currentStage?: string |
         </div>
       )}
 
+      {/* sub-agent work summary, shown once it has finished */}
+      {!isMain && !running && !scheduled && a.summary && (
+        <div
+          className="mt-1.5 rounded-md border-l-2 border-success/50 bg-success/5 px-2 py-1 text-[11px] leading-snug text-muted"
+          title={a.summary}
+        >
+          <span className="font-medium text-success/80">总结 </span>
+          <span className="line-clamp-3 whitespace-pre-wrap align-top">{a.summary}</span>
+        </div>
+      )}
+
       {scheduled && (
         <div className="mt-1.5 text-[11px] font-medium text-amber-400">⏳ 还有 {remainSec}s 执行</div>
       )}

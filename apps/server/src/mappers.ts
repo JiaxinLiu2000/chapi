@@ -98,6 +98,7 @@ export function toAgentRunDTO(a: AgentRun): AgentRunDTO {
     status: a.status as AgentRunDTO['status'],
     currentTool: a.currentTool,
     currentActivity: a.currentActivity,
+    summary: a.summary,
     tokens: a.tokens,
     startedAt: iso(a.startedAt),
     endedAt: iso(a.endedAt),
