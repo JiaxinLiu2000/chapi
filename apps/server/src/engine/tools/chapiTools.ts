@@ -9,6 +9,7 @@ import { searchWiki, writeWikiEntry } from '../../rag/wiki.js';
 import { pdfEdit } from '../../tools/pdf.js';
 import { hitl } from '../hitl.js';
 import { scheduler } from '../scheduler.js';
+import { emitAttention } from '../attention.js';
 
 const text = (s: string) => ({ content: [{ type: 'text' as const, text: s }] });
 
@@ -73,6 +74,7 @@ export function buildChapiToolServer(sessionId: string) {
         title: 'AI 需要你的输入',
         body: args.question,
       });
+      void emitAttention(sessionId, 'question', args.question);
       const answer = await hitl.waitForQuestion(q.id);
       return text(answer);
     },
@@ -130,6 +132,7 @@ export function buildChapiToolServer(sessionId: string) {
         title: '成果待审批',
         body: args.summary,
       });
+      void emitAttention(sessionId, 'approval', args.summary);
       const decision = await hitl.waitForApproval(approval.id);
       return text(
         `decision=${decision.decision}; feedback=${decision.feedback?.trim() || '(none)'}`,
@@ -153,6 +156,7 @@ export function buildChapiToolServer(sessionId: string) {
         title: args.title,
         body: args.body,
       });
+      void emitAttention(sessionId, 'notify', `${args.title}: ${args.body}`);
       return text('ok');
     },
   );

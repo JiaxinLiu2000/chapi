@@ -3,6 +3,7 @@ import { bus } from '../gateway/bus.js';
 import { createLogger } from '../logger.js';
 import { toAgentRunDTO } from '../mappers.js';
 import { getOrchestrator } from '../orchestrator/types.js';
+import { emitAttention } from './attention.js';
 
 const log = createLogger('scheduler');
 
@@ -55,6 +56,7 @@ class Scheduler {
       title: '定时任务触发',
       body: description,
     });
+    void emitAttention(sessionId, 'notify', `定时任务触发：${description}`);
     try {
       await getOrchestrator().handleUserMessage(sessionId, `[定时任务] 现在执行：${description}`);
     } catch (err) {

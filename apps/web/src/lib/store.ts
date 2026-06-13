@@ -20,6 +20,8 @@ export interface ToastNotification {
   title: string;
   body: string;
   ts: number;
+  /** If set, the toast is clickable and navigates to this session (background alert). */
+  sessionSlug?: string;
 }
 
 export interface BrowserPaneState {

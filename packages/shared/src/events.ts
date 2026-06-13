@@ -89,6 +89,17 @@ export type ServerEvent =
       type: 'browser.show';
       sessionId: string;
     }
+  | {
+      // Cross-session alert (delivered to ALL clients) so a background session's
+      // question/approval/completion pops a notification even when it's not the
+      // one being viewed.
+      type: 'session.attention';
+      sessionId: string;
+      slug: string;
+      title: string;
+      kind: 'question' | 'approval' | 'notify';
+      body: string;
+    }
   | { type: 'error'; sessionId: string | null; message: string };
 
 export type ServerEventType = ServerEvent['type'];

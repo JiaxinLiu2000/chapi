@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { Toasts } from '@/components/Toasts';
+import { GlobalAlerts } from '@/components/GlobalAlerts';
 
 export function Providers({ children }: { children: ReactNode }) {
   const [client] = useState(
@@ -14,6 +15,7 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={client}>
       {children}
+      <GlobalAlerts />
       <Toasts />
     </QueryClientProvider>
   );

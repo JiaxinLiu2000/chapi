@@ -33,5 +33,9 @@ export const bus = new EventBus();
 
 /** Events that every connected client should receive regardless of subscription. */
 export function isGlobalEvent(event: ServerEvent): boolean {
-  return event.type === 'session.created' || event.type === 'session.updated';
+  return (
+    event.type === 'session.created' ||
+    event.type === 'session.updated' ||
+    event.type === 'session.attention'
+  );
 }

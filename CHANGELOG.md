@@ -4,6 +4,15 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.26
+
+- **后台对话流通知**：当你切到别的对话流后，正在后台运行的会话（或等待中的定时任务）一旦
+  **提问 / 待审批 / 完成或定时触发**，会在右下角弹出一条**可点击的提示**（同时触发桌面通知），
+  点击即切换到该对话流。后台会话本就在服务端独立执行、定时器服务端触发，本次补齐了跨对话流的提示。
+- 实现：新增 `session.attention` 全局事件（`isGlobalEvent`，下发到所有客户端）+ `emitAttention()`；
+  `ask_user`/`request_approval`/`notify_user`/定时任务触发都会发出该事件；前端新增 `GlobalAlerts`
+  监听器（仅对**非当前**会话弹提示，当前会话仍走原有内联提示），Toast 支持点击跳转。
+
 ## v0.1.25
 
 - Batch scripts must drive the running **cloakbrowser over CDP** (connect_over_cdp
