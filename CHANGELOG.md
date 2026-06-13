@@ -4,6 +4,13 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.23
+
+- Resize: clamp the live-browser panel so it can no longer grow past the screen / squeeze the
+  chat to nothing (reserves room for the monitor + a chat minimum; chat can shrink via min-w-0).
+- Left monitor bar: the collapse/expand ‹ › chevrons are vertically centered, and the bar now
+  animates its width (200ms) when collapsing/expanding.
+
 ## v0.1.22
 
 - Fix "google_workspace 完全没连上": launch workspace-mcp with **--single-user** so it uses the

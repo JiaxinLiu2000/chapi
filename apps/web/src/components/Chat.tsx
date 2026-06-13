@@ -24,7 +24,7 @@ export function Chat({ sessionId }: { sessionId: string }) {
   };
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] flex-1 flex-col">
+    <div className="flex h-[calc(100vh-3.5rem)] min-w-0 flex-1 flex-col">
       <RunConfigBar sessionId={sessionId} />
       <div className="flex-1 overflow-y-auto px-4 py-6">
         <div className="mx-auto max-w-3xl">

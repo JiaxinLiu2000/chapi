@@ -169,21 +169,24 @@ export function MonitorCard() {
       return next;
     });
 
-  if (collapsed) {
-    return (
-      <aside
-        onClick={toggle}
-        title="展开监控"
-        className="hidden h-[calc(100vh-3.5rem)] w-6 shrink-0 cursor-pointer items-start justify-center border-r border-border bg-panel/50 pt-3 hover:bg-panel2 lg:flex"
-      >
-        <ChevronRight size={16} className="text-muted" />
-      </aside>
-    );
-  }
-
   return (
-    <aside className="hidden h-[calc(100vh-3.5rem)] w-72 shrink-0 border-r border-border bg-panel/50 lg:flex">
-      <div className="flex-1 overflow-y-auto p-3">
+    <aside
+      className={cn(
+        'hidden h-[calc(100vh-3.5rem)] shrink-0 overflow-hidden border-r border-border bg-panel/50 transition-[width] duration-200 ease-in-out lg:flex',
+        collapsed ? 'w-6' : 'w-72',
+      )}
+    >
+      {collapsed ? (
+        <button
+          onClick={toggle}
+          title="展开监控"
+          className="flex w-full cursor-pointer items-center justify-center hover:bg-panel2"
+        >
+          <ChevronRight size={16} className="text-muted" />
+        </button>
+      ) : (
+        <>
+          <div className="flex-1 overflow-y-auto p-3">
       {/* status + stats */}
       <div className="rounded-xl border border-border bg-panel p-3">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
@@ -243,15 +246,17 @@ export function MonitorCard() {
           </div>
         </div>
       )}
-      </div>
-      {/* clickable edge to collapse */}
-      <div
-        onClick={toggle}
-        title="折叠监控"
-        className="flex w-3 shrink-0 cursor-pointer items-start justify-center border-l border-border pt-3 hover:bg-panel2"
-      >
-        <ChevronLeft size={14} className="text-muted/60" />
-      </div>
+          </div>
+          {/* clickable edge to collapse (chevron vertically centered) */}
+          <div
+            onClick={toggle}
+            title="折叠监控"
+            className="flex w-3 shrink-0 cursor-pointer items-center justify-center border-l border-border hover:bg-panel2"
+          >
+            <ChevronLeft size={14} className="text-muted/60" />
+          </div>
+        </>
+      )}
     </aside>
   );
 }

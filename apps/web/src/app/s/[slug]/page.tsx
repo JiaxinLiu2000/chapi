@@ -25,7 +25,10 @@ export default function SessionPage() {
     const onMove = (e: MouseEvent) => {
       if (!dragging.current) return;
       const w = window.innerWidth - e.clientX;
-      setBrowserWidth(Math.min(Math.max(w, 320), Math.round(window.innerWidth * 0.75)));
+      // Reserve room for the monitor (~288px) + a chat minimum (~360px) so the
+      // browser panel can never grow past the screen / squeeze the chat to nothing.
+      const maxW = Math.max(360, window.innerWidth - 288 - 360);
+      setBrowserWidth(Math.min(Math.max(w, 320), maxW));
     };
     const onUp = () => {
       dragging.current = false;
