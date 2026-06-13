@@ -4,6 +4,13 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.39 — 历史记录下拉改版（可扩展到上百条）
+
+- 历史下拉加**搜索框**（按标题过滤）+ **状态筛选**（全部/进行中/已归档，各带计数）。
+- 列表按**时间分组**（今天/昨天/过去 7 天/过去 30 天/更早），上百条也好扫。
+- 列表项更舒展：进行中显示蓝点、已归档显示对勾;**高亮当前所在对话**；悬停才出删除按钮。
+- 下拉更宽（w-96）、sticky 头部（搜索+筛选不随滚动），最高 78vh 滚动。
+
 ## v0.1.38 — Wiki UI 改版（不再挤）
 
 - Wiki 页改为**全宽**布局（不再 max-w-6xl 居中挤在中间），内容区更舒展。
