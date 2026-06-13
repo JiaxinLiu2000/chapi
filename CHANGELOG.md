@@ -4,6 +4,14 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.29 — 启动不再因数据库瞬时不可达而崩溃
+
+- **问题**：服务端启动比 MySQL 接受连接早一瞬，supervisor 的 `ensureBrowserRunning()`（fire-and-forget）
+  里 `getBrowserEnabled()` 命中 Prisma 抛 `PrismaClientInitializationError`，**未捕获的 rejection 直接让整个 server 进程退出**。
+- **修复**：启动时先 `waitForDb()`（重试 `SELECT 1`，最多 30 次/每秒）直到数据库可用再继续；supervisor
+  的启动检查加 catch（失败只记日志、可在设置重试）；并加 `unhandledRejection`/`uncaughtException`
+  兜底——瞬时异步错误（DB 抖动、CDP 断开等）只记日志、**不再杀进程**，保证后台会话/定时任务存活。
+
 ## v0.1.28 — 浏览器改为脚本驱动 CDP（弃用易卡的 Playwright MCP）
 
 - **问题**：Playwright MCP（`npx @playwright/mcp`）初始化常卡住（日志里 `browser=pending` 几十秒），

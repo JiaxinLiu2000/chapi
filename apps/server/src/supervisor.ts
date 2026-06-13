@@ -43,7 +43,10 @@ class Supervisor {
   }
 
   start(): void {
-    void this.ensureBrowserRunning();
+    void this.ensureBrowserRunning().catch((err) => {
+      this.pushLog(`浏览器自动启动检查失败（稍后可在设置重试）: ${err}`);
+      log.warn('ensureBrowserRunning failed at startup', err);
+    });
   }
 
   /** Idempotent: ensure cloakserve is installed and listening on the CDP port. */

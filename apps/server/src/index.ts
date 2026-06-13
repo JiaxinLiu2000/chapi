@@ -1,5 +1,5 @@
 import { config, ensureBaseDirs } from './config.js';
-import { disconnectDb } from './db/client.js';
+import { disconnectDb, waitForDb } from './db/client.js';
 import { attachWebSocket } from './gateway/ws.js';
 import { buildApp } from './http/app.js';
 import { createLogger } from './logger.js';
@@ -13,6 +13,7 @@ const log = createLogger('server');
 
 async function main(): Promise<void> {
   ensureBaseDirs();
+  await waitForDb(); // don't touch the DB until MySQL actually accepts connections
   await seedWorkspaces();
   supervisor.start();
 
@@ -37,6 +38,15 @@ async function main(): Promise<void> {
   process.on('SIGINT', () => void shutdown('SIGINT'));
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
 }
+
+// Safety net: a transient async error (e.g. a brief DB blip, a CDP disconnect)
+// must NOT take down the whole server — background sessions/timers keep running.
+process.on('unhandledRejection', (reason) => {
+  log.error('unhandledRejection (server kept alive)', reason);
+});
+process.on('uncaughtException', (err) => {
+  log.error('uncaughtException (server kept alive)', err);
+});
 
 main().catch((err) => {
   log.error('fatal startup error', err);
