@@ -1,69 +1,65 @@
-# 技能：网页搜索与抓取（脚本驱动 cloakbrowser，over CDP）
+# 技能：网页搜索与抓取（cloakbrowser，**像真人一样**操作）
 
 ## 何时使用
 - 需要在 Google / 互联网搜索信息。
 - 需要从固定网站提取内容（表格、文章、价格等）。
 - 需要登录态才能访问的页面（用持久化登录的受控浏览器）。
 
-## 主要方式：用 `chapi_browser` 助手写脚本驱动 cloakbrowser
-平台的浏览器是 **cloakbrowser**（反检测内核 + 持久化登录 profile），始终在后台运行。
-**用脚本接管它**，而不是用 Playwright MCP（`mcp__browser__*` 默认关闭，启动慢且易卡）。
+## 铁律：始终经 cloakbrowser + 模拟真人
+反爬（Akamai、PerimeterX 等）**主要靠行为识别机器人**，不是只看指纹。脚本跑太快、冷链接直达详情页、
+循环猛刷，都会被封——而且 Akamai 的挑战脚本会把浏览器 CPU 拖满，导致**整个 cloakbrowser 卡死/打不开页面**。
+所以无论**探索**还是**写脚本**，都必须：
+1. **始终经 cloakbrowser**：用沙盘里的 `chapi_browser` 接管正在运行的浏览器；**不要另起浏览器、不要裸 requests/httpx**。
+2. **动作间随机停顿** + 滚动 + 移动鼠标：用 `human_goto / human_click / human_scroll / human_pause / human_type`，别瞬间连点。
+3. **顺网站路径走**：先 `warmup`/打开首页或列表/搜索页，再 **点进** 详情页；**绝不直接 goto 深层详情 URL**。
+4. **节流 + 低并发**：同一站点**一个页面顺序慢走**，循环里必有随机停顿；不要并发猛刷同域名。
+5. **被封/验证码 → 停手**：降低频率、换思路或 `ask_user`，不要硬刚（硬刚只会把 IP/账号烧掉）。
 
-会话沙盘里已自动放好 `chapi_browser.py`，直接 import 即可：
+`chapi_browser.py` 已自动放进会话沙盘，直接 import。
 
+## 拟人浏览示例（同步）
 ```python
-from chapi_browser import open_page
+from chapi_browser import open_page, warmup, human_click, human_scroll, human_pause
 
-# 单页：打开 → 操作 → 提取（退出时只关这个页面，不动共享浏览器）
-with open_page("https://www.google.com/search?q=site:example.com+pricing") as page:
-    page.wait_for_load_state("networkidle")
-    print(page.title())
-    # 用标准 Playwright API：page.click / page.fill / page.locator(...).inner_text() / page.content()
-    items = page.locator("div.result").all_inner_texts()
-    print(items[:5])
+with open_page() as page:                      # 新开一个页面（会显示在实时浏览器）
+    warmup(page, "https://site.com/")           # 先暖身：首页 + 随机停顿 + 滚动
+    human_click(page, "text=Search")            # 顺着导航走
+    human_scroll(page)                          # 像真人一样浏览列表
+    # 点进详情，而不是冷 goto 详情 URL：
+    for card in page.locator("div.result").all():
+        link = card.locator("a")
+        human_click(page, link)                 # 滚动到可见→悬停→点击→随机停顿
+        title = page.locator("h1").inner_text()
+        print(title)
+        page.go_back()                          # 回列表
+        human_pause()                           # 再随机停顿
 ```
 
-运行脚本（在沙盘 cwd 用 Bash）：
-```
-uv run --with playwright python research.py
-```
-- `connect_over_cdp` 只需 `playwright` 这个 Python 包，**不需要** `playwright install` 下载内核
-  （连的是已在跑的 cloakbrowser）。
-- 新开的页面会**自动出现在右侧「实时浏览器」**，用户可实时观察。
+运行：`uv run --with playwright python research.py`
+（connect_over_cdp 只需 `playwright` 包，**不需要** `playwright install`。）
 
-### 多页 / 交互复杂时
+## 多页 / 异步
 ```python
-from chapi_browser import connect
-with connect() as ctx:            # ctx = 持久化 profile（含登录态）
-    page = ctx.new_page(); page.goto("https://example.com/login")
-    # ... 多步交互 ...
-    page.close()                  # 只关你开的页面；别 ctx.close() / browser.close()
+from chapi_browser import connect, human_pause
+with connect() as ctx:            # 持久化 profile（含登录态）
+    page = ctx.new_page()
+    # ...拟人交互，循环里 human_pause()...
+    page.close()                  # 只关自己开的页面；别 ctx.close()/browser.close()
 ```
+- 异步 `open_page_async / connect_async / human_goto_async / human_pause_async`：**仅用于不同站点/互不依赖**的目标；
+  **同一站点不要高并发**（看起来像机器人，也会触发封锁）。
 
-### 异步（并行抓多页）
-```python
-import asyncio
-from chapi_browser import open_page_async
-async def grab(url):
-    async with open_page_async(url) as page:
-        return await page.title()
-print(asyncio.run(asyncio.gather(*[grab(u) for u in urls])))
-```
-
-## 安全约定（避免弄坏共享浏览器）
-- **绝不** `browser.close()` / `context.close()`（会断开连接、清空已开页面；助手已封装好，不要绕过）。
-- 只 `page.close()` 你自己开的页面。默认上下文是大家共用的持久化 profile。
+## 安全约定（别弄坏共享浏览器）
+- **绝不** `browser.close()` / `context.close()`（会断连、清空已开页面、拖垮实时浏览器）。
+- 只 `page.close()` 你自己开的页面。
 - 自检连接：`uv run --with playwright python chapi_browser.py https://example.com`。
 
 ## 登录
-- cloakbrowser 使用**专用持久化 profile**。若目标站点需要登录而当前未登录，调用 `ask_user`
-  请用户在受控浏览器窗口完成一次登录（登录态持久保存、后续脚本自动复用）。
-
-## 抓取结果的处理
-- 要点必要时用 `wiki_write` 沉淀（带 URL 来源）；临时数据放会话 `memory/web-cache`。
+- cloakbrowser 用**专用持久化 profile**。目标站点需登录而未登录时，调用 `ask_user` 请用户在浏览器窗口
+  完成一次登录（登录态持久保存、后续脚本自动复用）。
 
 ## 失败回退
-- 被风控/验证码：不要硬刚；调用 `ask_user` 说明情况、请用户协助或更换策略。
-- 连接失败（`chapi_browser` 报 CDP 连不上）：确认设置里已启用浏览器且已就绪（首次需下载内核）；可先跑自检命令。
-- Playwright 用法不清/报错：用 `context7` 或 `WebFetch` 查 Playwright 官方文档再重试。
-- 批量/重复抓取：见 `batch-scripting` 技能（先跑通→写脚本→小批测试→全量→抽查）。
+- 被风控/验证码：见铁律第 5 条，**停手**别硬刚。
+- 连接失败（CDP 连不上）：确认设置已启用浏览器且就绪（首次需下载内核）；先跑自检命令。
+- Playwright 用法不清/报错：用 `context7` 或 `WebFetch` 查官方文档再重试。
+- 批量/重复抓取：见 `batch-scripting`（先跑通→写脚本→小批测试→全量→抽查，全程拟人）。

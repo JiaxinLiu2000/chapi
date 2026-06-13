@@ -4,6 +4,18 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.30 — 浏览器“像真人一样”操作（防 Akamai 封锁 + 治卡顿）
+
+- **问题**：上几版把浏览改成“快速脚本直驱”，导致机械化、冷链接直达详情页 → 触发 Akamai 等**行为反爬**封锁；
+  而 Akamai 的挑战脚本把 cloakbrowser CPU 拖满 → 浏览器卡死/打不开页、CDP 反复掉线、supervisor 不停重启。
+- **方案——拟人**：`chapi_browser.py` 新增一套拟人助手：`human_pause`（动作间随机停顿）、`human_goto`、
+  `human_click`（滚动到可见→悬停→点击→停顿）、`human_scroll`、`human_mouse`、`human_type`、`warmup`（先暖身首页），
+  以及异步版。规则贯穿系统提示 + web-research / batch-scripting 技能：① 始终经 cloakbrowser；② 动作间随机停顿、
+  滚动、移动鼠标；③ **顺网站路径走**，先开首页/列表再**点进**详情，**绝不冷 goto 深层详情 URL**；④ 节流低并发，
+  同一站点顺序慢走、不并发猛刷；⑤ 被封/验证码就**停手**别硬刚。**探索与脚本都适用。**
+- **治卡顿**：实时浏览器截屏降负载（quality 55→45、1280×800→1100×720、everyNthFrame 2→4）、resync 间隔 3s→6s
+  减少 teardown 抖动；连接/重连失败时清理半连接的 pane 并只记简短日志（不再刷满 stack trace）。
+
 ## v0.1.29 — 启动不再因数据库瞬时不可达而崩溃
 
 - **问题**：服务端启动比 MySQL 接受连接早一瞬，supervisor 的 `ensureBrowserRunning()`（fire-and-forget）

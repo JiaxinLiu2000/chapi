@@ -118,7 +118,8 @@ class BrowserViewManager {
       }
       log.info(`CDP screencast connected (${this.panes.length} pane(s))`);
     } catch (err) {
-      log.warn('CDP connect failed', err);
+      await this.disconnectPanes(); // drop any half-connected pane
+      log.warn(`CDP connect failed: ${err instanceof Error ? err.message : String(err)}`);
       bus.emit({
         type: 'browser.state',
         sessionId: forSession,
@@ -166,19 +167,24 @@ class BrowserViewManager {
         });
       }
     });
+    // Keep the stream light: a heavy screencast competes for CPU with the page
+    // itself (and anti-bot challenge JS is already CPU-hungry), which can make
+    // cloakbrowser sluggish. Lower fps/quality is plenty for live monitoring.
     await Page.startScreencast({
       format: 'jpeg',
-      quality: 55,
-      maxWidth: 1280,
-      maxHeight: 800,
-      everyNthFrame: 2,
+      quality: 45,
+      maxWidth: 1100,
+      maxHeight: 720,
+      everyNthFrame: 4,
     });
   }
 
   /** Periodically re-sync which page targets are shown (e.g. agent opened a 2nd tab). */
   private startRefresh(): void {
     if (this.refresh) return;
-    this.refresh = setInterval(() => void this.resync(), 3000);
+    // Re-sync gently — frequent teardown/rebuild churns the browser, especially
+    // while a page is busy. 6s is responsive enough for new/closed tabs.
+    this.refresh = setInterval(() => void this.resync(), 6000);
   }
 
   private async resync(): Promise<void> {
@@ -207,7 +213,8 @@ class BrowserViewManager {
       if (targets.length === 0) await this.connectPane(0, undefined);
       else for (let i = 0; i < targets.length; i++) await this.connectPane(i, targets[i]?.id);
     } catch (err) {
-      log.warn('CDP resync connect failed', err);
+      await this.disconnectPanes(); // drop half-connected panes so the next resync starts clean
+      log.warn(`CDP resync connect failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       this.connecting = false;
     }
