@@ -4,6 +4,10 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.27
+
+- 启动器去掉「路由已预热，首次打开会话将更快」这条日志（预热仍照常进行，只是不再打印）。
+
 ## v0.1.26
 
 - **后台对话流通知**：当你切到别的对话流后，正在后台运行的会话（或等待中的定时任务）一旦

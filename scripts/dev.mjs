@@ -140,7 +140,6 @@ async function warmup() {
       /* ignore */
     }
   }
-  tag('web', '路由已预热，首次打开会话将更快');
 }
 
 main().catch((err) => {
