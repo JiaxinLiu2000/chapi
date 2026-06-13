@@ -4,6 +4,19 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.28 — 浏览器改为脚本驱动 CDP（弃用易卡的 Playwright MCP）
+
+- **问题**：Playwright MCP（`npx @playwright/mcp`）初始化常卡住（日志里 `browser=pending` 几十秒），
+  导致 AI「打不开浏览器」；而 cloakbrowser 的 CDP 其实是通的。
+- **方案**：新增沙盘助手 `chapi_browser.py`——AI 写脚本即可接管**正在运行的 cloakbrowser**
+  （`from chapi_browser import open_page` / `connect` / 异步 `*_async`），over CDP 复用反检测内核 +
+  持久化登录态，**只关自己开的页面、绝不关闭共享浏览器**（修复脚本误关浏览器导致后续打不开）。
+  用 `uv run --with playwright python 脚本.py` 运行（connect_over_cdp 不需要 `playwright install`）。
+- 助手会在建会话时 + 每次运行时自动拷进会话沙盘（老会话也能用）；服务端注入 `CHAPI_CDP_ENDPOINT`。
+- **Playwright MCP 默认关闭**（`mcp__browser__*`），设 `CHAPI_ENABLE_BROWSER_MCP=1` 才挂载。
+- 监控：检测到 Bash 跑浏览器脚本（chapi_browser/connect_over_cdp/playwright）即标「浏览器」并自动展开实时浏览器。
+- 同步更新系统提示 + web-research / batch-scripting / INDEX 技能，统一改为脚本驱动 CDP。
+
 ## v0.1.27
 
 - 启动器去掉「路由已预热，首次打开会话将更快」这条日志（预热仍照常进行，只是不再打印）。

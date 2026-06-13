@@ -20,6 +20,8 @@ import { buildCanUseTool } from './permissions.js';
 import { CHAPI_TOOL_NAMES, buildChapiToolServer } from './tools/chapiTools.js';
 import { buildExternalMcpServers } from './tools/mcpRegistry.js';
 import { latestSummary } from '../learning/summarize.js';
+import { ensureSandboxHelpers } from '../services/workspaces.js';
+import { sessionPaths } from '../config.js';
 
 const log = createLogger('engine:run');
 
@@ -86,6 +88,10 @@ export class Run {
 
     const session = await prisma.session.findUnique({ where: { id: this.sessionId } });
     if (!session) throw new Error(`session ${this.sessionId} not found`);
+
+    // Refresh sandbox script helpers (chapi_browser.py CDP interface) so even
+    // sessions created before this feature can `import chapi_browser`.
+    await ensureSandboxHelpers(sessionPaths(session.id).sandbox).catch(() => undefined);
 
     const anthropicKey = await settings.getAnthropicKey();
     const maxSubagents = await settings.getMaxSubagents();

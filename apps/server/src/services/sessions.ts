@@ -21,6 +21,7 @@ import {
 } from '../mappers.js';
 import { settings } from '../secrets.js';
 import { getOrchestrator } from '../orchestrator/types.js';
+import { ensureSandboxHelpers } from './workspaces.js';
 import { deriveTitle, makeSessionSlug } from '../util/ids.js';
 
 const log = createLogger('sessions');
@@ -56,6 +57,7 @@ async function scaffoldSessionDirs(sessionId: string): Promise<void> {
   await fs.mkdir(path.join(p.memory, 'web-cache'), { recursive: true });
   await fs.writeFile(path.join(p.memory, 'INDEX.md'), MEMORY_INDEX, 'utf8');
   await fs.writeFile(path.join(p.sandbox, 'INDEX.md'), SANDBOX_INDEX, 'utf8');
+  await ensureSandboxHelpers(p.sandbox);
 }
 
 export async function createSession(input: CreateSessionInput): Promise<SessionDTO> {

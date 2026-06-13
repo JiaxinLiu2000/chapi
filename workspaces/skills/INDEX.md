@@ -11,7 +11,7 @@
 - **并行**：互不依赖的耗时任务用 Task 子代理并行执行（上限见设置）。
 - **HITL**：`ask_user`（提问等待）、`request_approval`（成果审批）、`notify_user`、`save_artifact`。
 - **知识**：`wiki_search`（规划前先查）、`wiki_write`（沉淀经验，带来源）。
-- **网页**：cloakbrowser + Playwright（Google 搜索 / 固定站点抓取，专用持久化登录）。— 见 web-research/
+- **网页**：用沙盘里的 `chapi_browser` 助手写脚本驱动 cloakbrowser（`from chapi_browser import open_page`/`connect`，over CDP，复用反检测内核+持久化登录，只关自己开的页面；`uv run --with playwright python …`）。这是主要方式，Playwright MCP 默认关闭。— 见 web-research/ 与 batch-scripting/
 - **PDF**：本地 PyMuPDF/pypdf 对现有模板替换文字为主；Canva 仅用于从头设计。— 见 pdf-edit/
 - **Google Workspace**：Docs/Sheets/Drive 创建编辑；Gmail **仅草稿、禁止发送/转发/回复**（`draft_gmail_message`，extended 档）；Apps Script 自动化；在 `Chapi/<会话>/` 命名空间下操作，勿动他人文件。— 见 google-workspace/
 

@@ -81,8 +81,15 @@ export function describeActivity(toolName: string, input: unknown): ToolActivity
       return { tag: '编辑', label: `编辑文件: ${basename(i.file_path)}` };
     case 'NotebookEdit':
       return { tag: '编辑', label: `编辑笔记本: ${basename(i.notebook_path)}` };
-    case 'Bash':
-      return { tag: '命令', label: `运行命令: ${trunc(i.command, 48)}` };
+    case 'Bash': {
+      const cmd = String(i.command ?? '');
+      // A script driving the shared cloakbrowser over CDP → tag as browser so the
+      // live panel auto-opens and the user can watch it run.
+      if (/chapi_browser|connect_over_cdp|cloakbrowser|playwright/i.test(cmd)) {
+        return { tag: '浏览器', label: `浏览器(cloakbrowser) · 运行脚本: ${trunc(cmd, 40)}` };
+      }
+      return { tag: '命令', label: `运行命令: ${trunc(cmd, 48)}` };
+    }
     case 'Grep':
       return { tag: '检索', label: `检索代码: ${trunc(i.pattern, 40)}` };
     case 'Glob':

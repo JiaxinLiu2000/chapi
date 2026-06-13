@@ -22,7 +22,11 @@ export async function buildExternalMcpServers(): Promise<Record<string, McpServe
     servers.context7 = { type: 'stdio', command: 'npx', args: ['-y', '@upstash/context7-mcp'] };
   }
 
-  if (await settings.getBrowserEnabled()) {
+  // Playwright MCP is OFF by default: its `npx @playwright/mcp` startup is slow
+  // and has been observed to hang on init. The agent drives cloakbrowser directly
+  // over CDP via the `chapi_browser.py` sandbox helper instead (reliable, scriptable,
+  // shown live). Set CHAPI_ENABLE_BROWSER_MCP=1 to also expose the mcp__browser__* tools.
+  if ((await settings.getBrowserEnabled()) && process.env.CHAPI_ENABLE_BROWSER_MCP === '1') {
     servers.browser = {
       type: 'stdio',
       command: 'npx',
