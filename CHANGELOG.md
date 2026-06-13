@@ -4,6 +4,19 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.35 — 方案选型提示 + 秒级时间戳/超时纪律 + 修复第二个标签页无法导航
+
+- **规划选型提示**：系统提示新增"方案选型"段，教 AI 按情况选最优：查信息先用内置 `WebSearch`（快/无反爬），
+  批量/重复/结构化处理**写脚本**（省调用、稳定），互不依赖且**非浏览器**的活才用子代理并行，需对照两页时
+  在一个连接里 `new_tab` 开第二个标签减少切换；总原则 WebSearch→脚本→浏览器脚本→手动逐级升级。
+- **时间感知 + 超时纪律**：每轮对话（UserPromptSubmit hook）和每次工具返回（PostToolUse hook）都注入
+  **秒级时间戳**，让 AI 留意时间流逝、及早发现卡住。提示强调：任何工具/脚本都设**合理超时**，简单操作
+  十几秒无结果就怀疑卡住、果断中止重试，绝不无限干等。
+- **修复"第二个标签页无法导航 / 监控看不到"**：cloakbrowser + CDP 下 `ctx.new_page()` 建的标签拿不到
+  渲染进程，goto 永远卡在 commit（与并发无关，之前归因有误，已更正注释）。`new_tab()` 改为从已工作的页面
+  用 **`window.open` 弹出浏览器原生标签**（过 cloak 反检测注入、分到渲染进程）+ `bring_to_front` 置前，
+  并保留 `ctx.new_page()` 兜底。（实测：example.com 0.0s、bilibili 0.5s 打开；旧法 12s 超时/被关。）
+
 ## v0.1.34 — 子代理工作总结 + 并发浏览不再踩踏（单驱动锁 + 增量截屏）
 
 - **子代理工作总结**：子代理结束后，在监控里保留一段**工作总结**（取其最后一条 assistant 消息，

@@ -5,8 +5,10 @@ chapi_browser — 用 cloakbrowser **像真人一样**浏览网页（over CDP）
 加了**跨进程 CDP 锁**：两个子代理同时连会自动排队（不再握手踩踏卡死）。所以"两个子代理各开一个网站"
 能跑，但会**串行**。要真正"同时看两个页面"，请在**同一个脚本/连接**里用 `new_tab()` 多开（最多 2 个）。
 
-⚠️ 关键 2（复用默认页）：单页任务复用 `ctx.pages[0]`（`active_page(ctx)` / `open_page()` 已帮你做）。
-之前"新开页面无法导航"是并发踩踏所致，单驱动下 `new_tab()` 正常。
+⚠️ 关键 2（开标签的方式）：单页任务复用 `ctx.pages[0]`（`active_page(ctx)` / `open_page()` 已帮你做）。
+要多开标签**必须用 `new_tab()`**（内部走 `window.open` 弹原生标签）；**别直接 `ctx.new_page()`**——
+CDP 下它建的标签拿不到渲染进程，goto 永远卡在 commit（连 example.com 都打不开）。这与并发无关。
+（清残留标签：`GET http://127.0.0.1:<port>/json/close/{targetId}`。）
 
 ⚠️ 反爬（Akamai/PerimeterX 等）主要靠**行为**识别：
   1. **始终经 cloakbrowser**（本模块即接管运行中的 cloakbrowser，别另起浏览器、别裸 requests）。
@@ -291,10 +293,23 @@ def active_page(ctx):
 def new_tab(ctx, url: str | None = None, *, wait_until: str = "domcontentloaded"):
     """在**同一个连接**里多开一个标签页（同时浏览两个页面用，最多 2 个）。
 
-    ⚠️ 仅在**一个** chapi_browser 会话内安全（我们持有 CDP 锁、独占驱动）。**不要**用两个独立
-    脚本/子代理同时连浏览器开标签页——会握手踩踏。用完请 `page.close()` 关掉这个额外标签页。
+    ⚠️ **不要用 `ctx.new_page()`**：cloakbrowser + CDP 下它创建的目标拿不到可用渲染进程，会"无法
+    导航"（goto 永远卡在 commit，连 example.com 都打不开，重 JS 站还会被崩溃恢复关掉）。
+    正确做法：从一个**已工作的页面**用 `window.open` 弹出**浏览器原生标签**（会过 cloak 反检测注入、
+    分到渲染进程），再 `bring_to_front` 置前（防后台节流 + 让实时浏览器同屏显示）。
+    仅在**一个** chapi_browser 会话内安全（持有 CDP 锁、独占驱动）；用完 `page.close()` 关掉它。
     """
-    page = ctx.new_page()
+    opener = ctx.pages[0] if ctx.pages else ctx.new_page()  # 默认页一直可用
+    try:
+        with ctx.expect_page(timeout=10000) as pinfo:  # 捕获弹出的新页（evaluate 不回传 Page）
+            opener.evaluate("window.open('about:blank', '_blank')")
+        page = pinfo.value
+    except Exception:
+        page = ctx.new_page()  # 退路：window.open 被拦时
+    try:
+        page.bring_to_front()
+    except Exception:
+        pass
     if url:
         human_goto(page, url, wait_until=wait_until)
     return page
