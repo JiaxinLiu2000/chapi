@@ -4,6 +4,22 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.31 — 修复 cloakbrowser “死机”：崩溃-恢复死循环
+
+- **根因（已实测定位）**：cloakbrowser 是指纹伪装 Chromium（C++ 层 patch WebGL/canvas）。在 apartments.com
+  这类重度 WebGL/地图 + PerimeterX 站点上 GPU 进程会崩一次，Chromium 于是把 `Default/Preferences` 的
+  `exit_type` 记为 `"Crashed"`，**下次启动自动恢复那个重度崩溃标签 + 弹恢复气泡 → 立刻又崩 → profile 永久卡死**
+  （于是“连手动打开任何网页都死机”）。对照实验：用**全新 profile** 时（无论 headless 还是 headed、默认参数）
+  apartments.com 都能正常加载不崩——证明是**用户 profile 的崩溃状态**所致，而非指纹补丁本身；普通 Chrome 用的是
+  各自健康 profile，所以没事。
+- **修复**：`serve.py` 每次启动前**自愈 profile**——把 `exit_type` 重置为 `Normal`、清掉会话/标签恢复数据
+  （`Current/Last Session/Tabs`、`Sessions/`，**不动 cookie/登录态**），若检测到曾崩溃再清掉可能损坏的 GPU
+  着色器缓存（`GrShaderCache`/`ShaderCache`/`GraphiteDawnCache`）。启动参数加 `--hide-crash-restore-bubble`
+  `--disable-session-crashed-bubble` `--no-first-run`。
+- 新增 `CLOAKBROWSER_EXTRA_ARGS` 环境变量：必要时可加 `--disable-gpu` 或 `--fingerprint-noise=false`
+  作为重度站点的兜底稳定开关（一般用不到，自愈后默认参数即可）。
+- **生效方式**：重启启动器（Ctrl+C 后重新运行）即可自愈当前已卡死的 profile。
+
 ## v0.1.30 — 浏览器“像真人一样”操作（防 Akamai 封锁 + 治卡顿）
 
 - **问题**：上几版把浏览改成“快速脚本直驱”，导致机械化、冷链接直达详情页 → 触发 Akamai 等**行为反爬**封锁；
