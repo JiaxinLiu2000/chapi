@@ -4,6 +4,14 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.25
+
+- Batch scripts must drive the running **cloakbrowser over CDP** (connect_over_cdp
+  http://127.0.0.1:9222 + new page) to reuse its anti-detection kernel + saved logins, instead
+  of raw requests/httpx (which get anti-bot-blocked). The new page auto-appears in the live
+  browser panel (auto-split) so the user can watch the script run. Updated system prompt +
+  batch-scripting/web-research skills with a connect_over_cdp example.
+
 ## v0.1.24 — 工作流/提示/技能/监控/浏览器优化
 
 - **任务流（set_plan）**：新增工具，任何任务都建一个可见任务流；状态扩展为

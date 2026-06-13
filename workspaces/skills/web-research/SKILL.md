@@ -12,6 +12,11 @@
   请用户在受控浏览器窗口完成一次登录（登录态会持久保存、后续复用）。
 - 抓取的网页要点应：必要时用 `wiki_write` 沉淀（带 URL 来源），临时数据放会话 `memory/web-cache`。
 
+## 批量/脚本化（反反爬）
+- 大量/重复抓取改写脚本时，**脚本必须连到运行中的 cloakbrowser**（CDP `http://127.0.0.1:9222`，
+  `connect_over_cdp` 后 `contexts[0].new_page()`），复用反检测内核 + 登录态；新页面会自动显示在实时浏览器。
+- 不要用裸 `requests`/`httpx` 抓受保护站点（易被反爬）。详见 `batch-scripting` 技能。
+
 ## 失败回退
 - 被风控/验证码：不要硬刚；调用 `ask_user` 说明情况、请用户协助或更换策略。
 - 工具用法不清/报错：先用 `context7` 或 `WebFetch` 阅读 Playwright MCP 文档，再重试。
