@@ -4,6 +4,14 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.33 — "Claude 调用"实时计数（不再一直是 0）
+
+- **问题**：v0.1.32 的"Claude 调用"只在每轮**结束**（`result`）时才 +1，所以任务进行中、或一轮被中断/
+  DB 崩溃打断时，它一直显示 0（实测：某会话工具调用已 39 次，但 claudeCalls 仍为 0，因为那一轮没跑到 result）。
+- **修复**：改为**每条 assistant 消息（一次 Claude Code 模型响应）实时 +1**，且**包含后台子代理**的响应——
+  这正是"Claude Code 在后台被调用的次数"。计数随工作实时增长，不会卡在 0；从 `handleResult` 移除原先的
+  回合末计数避免重复。
+
 ## v0.1.32 — 浏览器复用默认页修复 + 上传进沙盘 + 监控计数 + 闲置自动收起
 
 - **修复"打不开浏览器/首次全超时"**：`chapi_browser` 改为**复用 cloakbrowser 已有的持久化页面

@@ -206,6 +206,15 @@ export class Run {
       parent_tool_use_id?: string | null;
       subagent_type?: string;
     };
+    // Each assistant message = one Claude Code model response (main agent OR a
+    // background sub-agent). Count it live so "Claude 调用" grows as work happens
+    // (instead of only at turn end, which reads 0 during/after interrupted turns).
+    const sess = await prisma.session.update({
+      where: { id: this.sessionId },
+      data: { claudeCalls: { increment: 1 } },
+    });
+    bus.emit({ type: 'usage.updated', sessionId: this.sessionId, usage: sessionUsage(sess) });
+
     // Subagent text is surfaced via monitoring, not the main chat transcript.
     if (m.parent_tool_use_id || m.subagent_type) return;
 
@@ -253,7 +262,6 @@ export class Run {
       };
       total_cost_usd?: number;
       duration_ms?: number;
-      num_turns?: number;
     };
     const u = m.usage ?? {};
     const input = u.input_tokens ?? 0;
@@ -271,8 +279,7 @@ export class Run {
         totalTokens: { increment: input + output },
         costUsd: { increment: m.total_cost_usd ?? 0 },
         activeMs: { increment: m.duration_ms ?? 0 },
-        // "Claude 调用次数" — count the model turns this result reported (≥1 per turn).
-        claudeCalls: { increment: Math.max(1, m.num_turns ?? 1) },
+        // (claudeCalls is incremented live per assistant message in handleAssistant.)
       },
     });
     bus.emit({ type: 'usage.updated', sessionId: this.sessionId, usage: sessionUsage(updated) });
