@@ -4,6 +4,13 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.38 — Wiki UI 改版（不再挤）
+
+- Wiki 页改为**全宽**布局（不再 max-w-6xl 居中挤在中间），内容区更舒展。
+- 侧栏：加**搜索框**（按标题/标签过滤）+ 条目计数；列表项改成**卡片**（更大间距、两行标题、时间 + 标签 chip、
+  悬停/选中态）。
+- 正文：更大标题、标签 chip + 更新时间、`leading-relaxed` 正文、来源区改为带边框的卡片。空态文案更新为「归档」。
+
 ## v0.1.37 — 归档/完成时不再误报"Operation aborted"
 
 - **问题**：点击"归档"完成任务时弹出运行错误 `Operation aborted`。原因是归档会主动停止运行（abort
