@@ -58,7 +58,6 @@ class BrowserViewManager {
   private panes: Pane[] = [];
   private busy = false;
   private refresh: NodeJS.Timeout | null = null;
-  private lastSeenIds: string[] = []; // for debounce: target set from the previous poll
 
   async addViewer(sessionId: string): Promise<void> {
     this.viewers.add(sessionId);
@@ -140,7 +139,6 @@ class BrowserViewManager {
     try {
       const maxPages = await settings.getMaxBrowserPages();
       const targets = await this.activeTargets(maxPages);
-      this.lastSeenIds = targets.map((t) => t.id);
       if (targets.length === 0) {
         await this.connectPane(undefined); // show the current/default tab on open
       } else {
@@ -171,9 +169,16 @@ class BrowserViewManager {
     for (const pane of [...this.panes]) {
       if (!desiredIds.includes(pane.targetId)) await this.closePane(pane);
     }
-    // Attach to newly-appeared targets.
+    // Attach to newly-appeared targets (each independently — one failing attach
+    // must not stop the others, so both active tabs still show).
     for (const t of desired) {
-      if (!this.panes.find((p) => p.targetId === t.id)) await this.connectPane(t.id);
+      if (!this.panes.find((p) => p.targetId === t.id)) {
+        try {
+          await this.connectPane(t.id);
+        } catch (err) {
+          log.warn(`attach pane failed for ${t.id}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
     }
     // Order panes by desired order and reassign slot indices.
     this.panes.sort((a, b) => desiredIds.indexOf(a.targetId) - desiredIds.indexOf(b.targetId));
@@ -239,8 +244,8 @@ class BrowserViewManager {
 
   private startRefresh(): void {
     if (this.refresh) return;
-    // Gentle cadence; combined with debounce a new tab appears ~6–12s after it opens.
-    this.refresh = setInterval(() => void this.resync(), 6000);
+    // Poll briskly so a 2nd tab appears within a few seconds and idle tabs drop fast.
+    this.refresh = setInterval(() => void this.resync(), 3000);
   }
 
   private async resync(): Promise<void> {
@@ -255,18 +260,14 @@ class BrowserViewManager {
       // All pages idle/blank → the agent stopped browsing. Collapse the panel.
       if (desiredIds.length === 0) {
         if (this.panes.length) await this.closeAllPanes();
-        this.lastSeenIds = [];
         this.hideForAllViewers();
         return;
       }
 
-      // Debounce: only act once a target set has been stable for one poll. This
-      // avoids attaching to a tab the agent is still creating/navigating (the race
-      // that caused TargetClosedError).
-      const stable = sameIds(desiredIds, this.lastSeenIds);
-      this.lastSeenIds = desiredIds;
-      if (!stable) return;
-
+      // Incremental: attach to NEW active targets, close GONE ones, leave unchanged
+      // panes alone. This is how a 2nd active tab appears and how 2→1 happens when
+      // one tab goes idle. (No debounce — window.open tabs are real, so attaching is
+      // safe; the earlier TargetClosedError was from dead ctx.new_page() targets.)
       const haveIds = this.panes.map((p) => p.targetId);
       if (sameIds(desiredIds, haveIds)) return; // nothing changed
 
@@ -301,7 +302,6 @@ class BrowserViewManager {
       clearInterval(this.refresh);
       this.refresh = null;
     }
-    this.lastSeenIds = [];
     await this.closeAllPanes();
     log.info('CDP screencast disconnected');
   }

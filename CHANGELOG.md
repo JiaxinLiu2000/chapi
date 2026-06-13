@@ -4,6 +4,18 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.36 — 实时浏览器：两个标签页都显示 + 闲置可靠收起
+
+- **问题**：用两个标签页时实时浏览器从头到尾只显示一个。根因是 Chromium 只合成**前台**标签，Windows 上
+  更会因 `CalculateNativeWinOcclusion` 把后台/被遮挡标签停掉合成，导致第二个标签的 screencast 不出帧。
+- **修复（多管齐下）**：
+  - `serve.py` 启动加 `--disable-features=CalculateNativeWinOcclusion`、`--disable-backgrounding-occluded-windows`、
+    `--disable-renderer-backgrounding`、`--disable-background-timer-throttling`——让非前台标签也持续合成出帧。
+  - `browserView.ts` 截屏去掉防抖延迟、轮询 6s→3s，**增量**接入新标签/关闭消失标签，且**每个 pane 独立接入**
+    （一个失败不影响另一个）。只要有 ≥2 个活跃标签，就显示活跃的 2 个（上下分屏）。
+  - `chapi_browser.connect()` 收尾**关掉多开的标签、默认页回到空白**——闲置后 activeTargets 归零 → 实时浏览器
+    自动收起；单个标签变空闲则 2→1。
+
 ## v0.1.35 — 方案选型提示 + 秒级时间戳/超时纪律 + 修复第二个标签页无法导航
 
 - **规划选型提示**：系统提示新增"方案选型"段，教 AI 按情况选最优：查信息先用内置 `WebSearch`（快/无反爬），

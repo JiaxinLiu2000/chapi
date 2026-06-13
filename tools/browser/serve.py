@@ -89,6 +89,14 @@ args = [
     "--hide-crash-restore-bubble",
     "--disable-session-crashed-bubble",
     "--no-first-run",
+    # Keep NON-foreground tabs compositing so the live-view screencast emits frames
+    # for the 2nd tab too (otherwise Chromium freezes background/occluded tabs and the
+    # monitor only ever shows the active one). CalculateNativeWinOcclusion is the
+    # Windows-specific culprit.
+    "--disable-features=CalculateNativeWinOcclusion",
+    "--disable-backgrounding-occluded-windows",
+    "--disable-renderer-backgrounding",
+    "--disable-background-timer-throttling",
 ]
 extra = os.environ.get("CLOAKBROWSER_EXTRA_ARGS", "").split()
 if extra:

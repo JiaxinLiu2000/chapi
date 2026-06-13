@@ -332,7 +332,25 @@ def connect(*, default_timeout_ms: int = 45000):
             ctx.set_default_timeout(default_timeout_ms)
         except Exception:
             pass
-        yield ctx
+        try:
+            yield ctx
+        finally:
+            # 收尾：关掉多开的标签、默认页回到空白 → 闲置后实时浏览器自动收起。
+            # （绝不 browser.close()/ctx.close()。）
+            try:
+                pages = list(ctx.pages)
+                for p in pages[1:]:
+                    try:
+                        p.close()
+                    except Exception:
+                        pass
+                if pages:
+                    try:
+                        pages[0].goto(_BLANK)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
 
 @contextmanager
