@@ -4,6 +4,13 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.37 — 归档/完成时不再误报"Operation aborted"
+
+- **问题**：点击"归档"完成任务时弹出运行错误 `Operation aborted`。原因是归档会主动停止运行（abort
+  SDK 子进程），而运行循环的 catch 把这个**有意的中止**也当成错误 emit 出来，给用户弹了错误提示。
+- **修复**：`run.ts` 的 consume catch 里，若是**有意中止**（`abortController.signal.aborted` 或 AbortError/
+  "...aborted" 消息）只记 debug、不再 emit error 事件。归档照常完成、学习复盘照常进行，只是不再误报。
+
 ## v0.1.36 — 实时浏览器：两个标签页都显示 + 闲置可靠收起
 
 - **问题**：用两个标签页时实时浏览器从头到尾只显示一个。根因是 Chromium 只合成**前台**标签，Windows 上

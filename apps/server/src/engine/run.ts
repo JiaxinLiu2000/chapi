@@ -25,6 +25,13 @@ import { sessionPaths } from '../config.js';
 
 const log = createLogger('engine:run');
 
+/** True for the abort that an intentional stop/interrupt raises (not a real failure). */
+function isAbortError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as { name?: string; message?: string };
+  return e.name === 'AbortError' || /\baborted\b/i.test(e.message ?? '');
+}
+
 export type QueryFn = (params: {
   prompt: AsyncIterable<SDKUserMessage>;
   options?: Options;
@@ -141,12 +148,19 @@ export class Run {
         await this.handle(msg);
       }
     } catch (err) {
-      log.error('run loop error', err);
-      bus.emit({
-        type: 'error',
-        sessionId: this.sessionId,
-        message: err instanceof Error ? err.message : 'engine error',
-      });
+      // An intentional stop (archive / delete / shutdown) aborts the SDK child
+      // process, which surfaces here as "Operation aborted" — that's not an error,
+      // so don't alarm the user with an error toast.
+      if (this.abort.signal.aborted || isAbortError(err)) {
+        log.debug('run loop stopped (aborted)');
+      } else {
+        log.error('run loop error', err);
+        bus.emit({
+          type: 'error',
+          sessionId: this.sessionId,
+          message: err instanceof Error ? err.message : 'engine error',
+        });
+      }
     } finally {
       // Tolerate a session deleted mid-run (writes would FK-fail).
       await this.monitor.finishAll('done').catch(() => undefined);
