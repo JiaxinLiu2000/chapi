@@ -168,12 +168,25 @@ export class Run {
   }
 
   private async handleSystem(msg: SDKMessage): Promise<void> {
-    const m = msg as { subtype?: string; session_id?: string; state?: string };
-    if (m.subtype === 'init' && m.session_id) {
-      await prisma.session.update({
-        where: { id: this.sessionId },
-        data: { sdkSessionId: m.session_id },
-      });
+    const m = msg as {
+      subtype?: string;
+      session_id?: string;
+      state?: string;
+      mcp_servers?: Array<{ name: string; status: string }>;
+    };
+    if (m.subtype === 'init') {
+      if (m.session_id) {
+        await prisma.session.update({
+          where: { id: this.sessionId },
+          data: { sdkSessionId: m.session_id },
+        });
+      }
+      // Log MCP connection status (helps diagnose e.g. google_workspace not loading).
+      // Note: stdio MCPs are usually "pending" in this init snapshot and connect a
+      // few seconds later — so we only log, not alarm.
+      if (Array.isArray(m.mcp_servers) && m.mcp_servers.length > 0) {
+        log.info(`MCP servers: ${m.mcp_servers.map((s) => `${s.name}=${s.status}`).join(', ')}`);
+      }
     } else if (m.subtype === 'session_state_changed') {
       const state =
         m.state === 'running' ? 'running' : m.state === 'requires_action' ? 'paused' : 'idle';

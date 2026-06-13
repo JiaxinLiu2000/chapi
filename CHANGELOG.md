@@ -4,6 +4,14 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.22
+
+- Fix "google_workspace 完全没连上": launch workspace-mcp with **--single-user** so it uses the
+  cached OAuth credentials directly (without it, multi-user/session mapping left the agent
+  session with no working Google tools). Verified the MCP starts and registers 91 tools incl.
+  draft_gmail_message (send_gmail_message stays blocked).
+- Log MCP connection status on session init (no longer false-alarms on the normal "pending").
+
 ## v0.1.21
 
 - Left monitor bar is now **collapsible** (click the edge to collapse/expand; remembered in
