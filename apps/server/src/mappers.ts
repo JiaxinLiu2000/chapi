@@ -52,6 +52,9 @@ export function sessionUsage(s: Session): UsageDTO {
     totalTokens: s.totalTokens,
     costUsd: s.costUsd,
     activeMs: s.activeMs,
+    claudeCalls: s.claudeCalls,
+    toolCallCount: s.toolCallCount,
+    learnings: s.learnings,
   };
 }
 

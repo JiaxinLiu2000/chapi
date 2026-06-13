@@ -91,6 +91,22 @@ class BrowserViewManager {
     return arr.filter((t) => t.type === 'page').map((t) => ({ id: t.id, url: t.url }));
   }
 
+  /** A blank/new-tab page is "idle" — the agent isn't actively browsing on it. */
+  private isIdleUrl(url?: string): boolean {
+    const u = (url ?? '').trim().toLowerCase();
+    return u === '' || u === 'about:blank' || u === 'about:newtab' || u.startsWith('chrome://new');
+  }
+
+  /** Non-idle page targets (what we actually show), capped to maxPages. */
+  private async activeTargets(maxPages: number): Promise<Array<{ id: string; url: string }>> {
+    const all = await this.listPageTargets().catch(() => []);
+    return all.filter((t) => !this.isIdleUrl(t.url)).slice(0, maxPages);
+  }
+
+  private hideForAllViewers(): void {
+    for (const sid of this.viewers) bus.emit({ type: 'browser.hide', sessionId: sid });
+  }
+
   private async ensureConnected(forSession: string): Promise<void> {
     if (this.panes.length || this.connecting) return;
     if (!(await cloakserveReachable())) {
@@ -109,9 +125,10 @@ class BrowserViewManager {
     this.connecting = true;
     try {
       const maxPages = await settings.getMaxBrowserPages();
-      const targets = (await this.listPageTargets().catch(() => [])).slice(0, maxPages);
+      const targets = await this.activeTargets(maxPages);
       if (targets.length === 0) {
-        // No discrete page targets — screencast the default target as pane 0.
+        // Nothing active yet — screencast the default target as pane 0 (resync will
+        // collapse it shortly if it stays blank).
         await this.connectPane(0, undefined);
       } else {
         for (let i = 0; i < targets.length; i++) await this.connectPane(i, targets[i]?.id);
@@ -191,27 +208,32 @@ class BrowserViewManager {
     if (this.viewers.size === 0 || this.connecting) return;
     if (!(await cloakserveReachable())) return;
     const maxPages = await settings.getMaxBrowserPages();
-    const targets = (await this.listPageTargets().catch(() => [])).slice(0, maxPages);
+    const targets = await this.activeTargets(maxPages);
+    // All pages idle/blank → the agent stopped browsing. Stop streaming and ask
+    // the clients to auto-collapse the live browser panel.
+    if (targets.length === 0) {
+      if (this.panes.length) await this.disconnectPanes();
+      this.hideForAllViewers();
+      return;
+    }
     const wantIds = targets.map((t) => t.id);
     const haveIds = this.panes.map((p) => p.targetId);
-    // Rebuild only if the set of shown targets changed.
+    // Rebuild only if the set of shown (active) targets changed — this is also how
+    // 2 panes drop to 1 when one tab goes blank.
     const changed =
       wantIds.length !== haveIds.length || wantIds.some((id, i) => id !== haveIds[i]);
-    if (!changed || wantIds.length === 0) return;
+    if (!changed) return;
     await this.disconnectPanes();
-    await this.ensureConnectedFresh();
+    await this.ensureConnectedFresh(targets);
     const sid = [...this.viewers][0];
     if (sid) this.emitStateTo(sid, this.panes.length ? 'connected' : 'connecting');
   }
 
-  private async ensureConnectedFresh(): Promise<void> {
+  private async ensureConnectedFresh(targets: Array<{ id: string; url: string }>): Promise<void> {
     // like ensureConnected but assumes reachable + not guarded by existing panes
     this.connecting = true;
     try {
-      const maxPages = await settings.getMaxBrowserPages();
-      const targets = (await this.listPageTargets().catch(() => [])).slice(0, maxPages);
-      if (targets.length === 0) await this.connectPane(0, undefined);
-      else for (let i = 0; i < targets.length; i++) await this.connectPane(i, targets[i]?.id);
+      for (let i = 0; i < targets.length; i++) await this.connectPane(i, targets[i]?.id);
     } catch (err) {
       await this.disconnectPanes(); // drop half-connected panes so the next resync starts clean
       log.warn(`CDP resync connect failed: ${err instanceof Error ? err.message : String(err)}`);

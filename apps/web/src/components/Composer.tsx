@@ -1,6 +1,6 @@
 'use client';
 import { useRef, useState } from 'react';
-import { ArrowUp, Paperclip, Square } from 'lucide-react';
+import { ArrowUp, Paperclip, Square, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useStore } from '@/lib/store';
 import { getSocket } from '@/lib/ws';
@@ -10,15 +10,25 @@ export function Composer({ sessionId, disabled }: { sessionId: string; disabled?
   const [uploading, setUploading] = useState(false);
   const runState = useStore((s) => s.runState);
   const addUser = useStore((s) => s.addOptimisticUser);
+  const pending = useStore((s) => s.pendingAttachments);
+  const addPending = useStore((s) => s.addPendingAttachments);
+  const clearPending = useStore((s) => s.clearPendingAttachments);
   const fileRef = useRef<HTMLInputElement>(null);
   const running = runState === 'running';
 
   const send = () => {
     const t = text.trim();
-    if (!t) return;
-    addUser(t);
-    getSocket().send({ type: 'user.message', sessionId, text: t });
+    if (!t && pending.length === 0) return;
+    // Append the just-uploaded file locations so the agent can find them at once.
+    let msg = t;
+    if (pending.length > 0) {
+      const lines = pending.map((a) => `- ${a.filename} → ${a.sandboxPath}`).join('\n');
+      msg = `${t ? `${t}\n\n` : ''}[本次上传的文件（位于会话沙盘，可直接读取/编辑）]\n${lines}`;
+    }
+    addUser(msg);
+    getSocket().send({ type: 'user.message', sessionId, text: msg });
     setText('');
+    clearPending();
   };
 
   const onFiles = async (files: FileList | null) => {
@@ -26,10 +36,13 @@ export function Composer({ sessionId, disabled }: { sessionId: string; disabled?
     setUploading(true);
     try {
       const r = await api.upload(sessionId, Array.from(files));
+      addPending(
+        r.attachments.map((a) => ({ filename: a.filename, sandboxPath: a.sandboxPath ?? a.filename })),
+      );
       useStore.setState({
         toast: {
           level: 'info',
-          title: '已上传到原始资料',
+          title: '已上传，将随下条消息发给 AI',
           body: r.attachments.map((a) => a.filename).join(', '),
           ts: Date.now(),
         },
@@ -54,6 +67,31 @@ export function Composer({ sessionId, disabled }: { sessionId: string; disabled?
 
   return (
     <div className="rounded-2xl border border-border bg-panel p-2">
+      {pending.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 px-2 pb-1 pt-1">
+          {pending.map((a, i) => (
+            <span
+              key={`${a.sandboxPath}-${i}`}
+              className="inline-flex items-center gap-1 rounded-md bg-panel2 px-2 py-1 text-xs text-text"
+              title={a.sandboxPath}
+            >
+              <Paperclip size={12} className="text-muted" />
+              <span className="max-w-[160px] truncate">{a.filename}</span>
+              <button
+                onClick={() =>
+                  useStore.setState((s) => ({
+                    pendingAttachments: s.pendingAttachments.filter((_, j) => j !== i),
+                  }))
+                }
+                className="text-muted hover:text-danger"
+                title="移除"
+              >
+                <X size={12} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
@@ -88,7 +126,7 @@ export function Composer({ sessionId, disabled }: { sessionId: string; disabled?
           )}
           <button
             onClick={send}
-            disabled={!text.trim()}
+            disabled={!text.trim() && pending.length === 0}
             className="grid h-9 w-9 place-items-center rounded-xl bg-accent text-white transition hover:brightness-110 disabled:opacity-40"
           >
             <ArrowUp size={18} />

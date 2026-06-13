@@ -24,6 +24,12 @@ export interface ToastNotification {
   sessionSlug?: string;
 }
 
+/** A just-uploaded file awaiting inclusion in the next outgoing message. */
+export interface PendingAttachment {
+  filename: string;
+  sandboxPath: string;
+}
+
 export interface BrowserPaneState {
   frame: string | null; // base64 jpeg
   url: string | null;
@@ -57,6 +63,8 @@ interface ChapiState {
   questions: PendingQuestionDTO[];
   approvals: ApprovalRequestDTO[];
   toast: ToastNotification | null;
+  /** Files uploaded since the last message; their paths are appended to the next send. */
+  pendingAttachments: PendingAttachment[];
 
   // live cloakbrowser view
   browserPages: BrowserPaneState[]; // up to 2 live panes
@@ -68,6 +76,8 @@ interface ChapiState {
   resetActive: () => void;
   setBrowserViewOn: (on: boolean) => void;
   clearToast: () => void;
+  addPendingAttachments: (items: PendingAttachment[]) => void;
+  clearPendingAttachments: () => void;
   addOptimisticUser: (text: string) => void;
   applyEvent: (e: ServerEvent) => void;
 }
@@ -95,12 +105,16 @@ export const useStore = create<ChapiState>((set, get) => ({
   questions: [],
   approvals: [],
   toast: null,
+  pendingAttachments: [],
   browserPages: idlePanes(),
   browserPageCount: 1,
   browserViewOn: false,
 
   setSessions: (s) => set({ sessions: s }),
   setBrowserViewOn: (on) => set({ browserViewOn: on }),
+  addPendingAttachments: (items) =>
+    set((s) => ({ pendingAttachments: [...s.pendingAttachments, ...items] })),
+  clearPendingAttachments: () => set({ pendingAttachments: [] }),
 
   loadDetail: (d) =>
     set({
@@ -116,6 +130,7 @@ export const useStore = create<ChapiState>((set, get) => ({
       approvals: [],
       runState: 'idle',
       toolCalls: [],
+      pendingAttachments: [],
       browserPages: idlePanes(),
       browserPageCount: 1,
       browserViewOn: false,
@@ -135,6 +150,7 @@ export const useStore = create<ChapiState>((set, get) => ({
       runState: 'idle',
       questions: [],
       approvals: [],
+      pendingAttachments: [],
       browserPages: idlePanes(),
       browserPageCount: 1,
       browserViewOn: false,

@@ -4,6 +4,22 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.32 — 浏览器复用默认页修复 + 上传进沙盘 + 监控计数 + 闲置自动收起
+
+- **修复"打不开浏览器/首次全超时"**：`chapi_browser` 改为**复用 cloakbrowser 已有的持久化页面
+  `ctx.pages[0]`，不再 `new_page()`**——经 CDP 新开的页面无法导航（goto 卡到超时，连 example.com 都打不开）；
+  复用默认页后秒开。新增 `active_page(ctx)`，`open_page()` 退出时把页面导回 `about:blank`。
+- **拟人/反爬强化**：新增 `click_next(page)`（点"下一页"按钮，**别拼 `?page=2` 冷跳**）、`wait_for_any(...)`
+  （等延迟/封装加载的搜索框，解决 `inputs: 0`）。小批测试改为"**跑几页、随机抽 ~5 条核对**"。
+- **Windows 控制台编码**：脚本环境注入 `PYTHONUTF8=1` / `PYTHONIOENCODING=utf-8`，并把自检里的 `→`
+  换成 ASCII，避免 cp1252 报错。
+- **上传文件**：除存入原始资料外，**同时复制一份到当前会话沙盘 `uploads/`**；上传后在**下一条消息**
+  自动附带各文件在沙盘的位置（输入框上方显示可移除的文件 chip），AI 可立即定位；支持一次多文件。
+- **监控计数改版（实时）**：成本→**Claude 调用**次数；代理→**工具调用**次数；Token→**学习次数**（wiki_write）。
+  新增 Session 列 `claudeCalls`/`toolCallCount`/`learnings`，随事件实时增长并持久化。
+- **实时浏览器闲置自愈**：页面回到空白即视为闲置——两个窗口只剩一个活动时 **2→1 分屏**，**全部闲置则
+  自动收起**实时浏览器面板（新增 `browser.hide` 事件）。
+
 ## v0.1.31 — 修复 cloakbrowser “死机”：崩溃-恢复死循环
 
 - **根因（已实测定位）**：cloakbrowser 是指纹伪装 Chromium（C++ 层 patch WebGL/canvas）。在 apartments.com

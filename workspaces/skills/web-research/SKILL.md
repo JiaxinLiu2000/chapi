@@ -7,15 +7,18 @@
 
 ## 铁律：始终经 cloakbrowser + 模拟真人
 反爬（Akamai、PerimeterX 等）**主要靠行为识别机器人**，不是只看指纹。脚本跑太快、冷链接直达详情页、
-循环猛刷，都会被封——而且 Akamai 的挑战脚本会把浏览器 CPU 拖满，导致**整个 cloakbrowser 卡死/打不开页面**。
+循环猛刷，都会被封——而且其挑战脚本会把浏览器 CPU 拖满，导致**整个 cloakbrowser 卡死/打不开页面**。
 所以无论**探索**还是**写脚本**，都必须：
 1. **始终经 cloakbrowser**：用沙盘里的 `chapi_browser` 接管正在运行的浏览器；**不要另起浏览器、不要裸 requests/httpx**。
-2. **动作间随机停顿** + 滚动 + 移动鼠标：用 `human_goto / human_click / human_scroll / human_pause / human_type`，别瞬间连点。
-3. **顺网站路径走**：先 `warmup`/打开首页或列表/搜索页，再 **点进** 详情页；**绝不直接 goto 深层详情 URL**。
-4. **节流 + 低并发**：同一站点**一个页面顺序慢走**，循环里必有随机停顿；不要并发猛刷同域名。
-5. **被封/验证码 → 停手**：降低频率、换思路或 `ask_user`，不要硬刚（硬刚只会把 IP/账号烧掉）。
+2. **复用默认页，别 `new_page()`**：`open_page()`/`connect()` 已复用 `ctx.pages[0]`。经 CDP 新开的页面**无法导航**（goto 卡到超时，连 example.com 都打不开）；复用默认页则秒开。
+3. **动作间随机停顿** + 滚动 + 移动鼠标：用 `human_goto / human_click / human_scroll / human_pause / human_type`，别瞬间连点。
+4. **顺网站路径走**：先 `warmup`/打开首页或列表/搜索页，再 **点进** 详情页；**绝不直接 goto 深层详情 URL**。
+5. **翻页点"下一页"按钮**：用 `click_next(page)`，**别拼 `?page=2` 冷跳**。
+6. **节流 + 低并发**：同一站点**一个页面顺序慢走**，循环里必有随机停顿；不要并发猛刷同域名。
+7. **被封/验证码 → 停手**：降低频率、换思路或 `ask_user`，不要硬刚（硬刚只会把 IP/账号烧掉）。
 
-`chapi_browser.py` 已自动放进会话沙盘，直接 import。
+`chapi_browser.py` 已自动放进会话沙盘，直接 import。搜索框常是延迟/封装加载（`inputs: 0`）——
+用 `wait_for_any(page, [...selectors])` 或 `page.get_by_role("searchbox")` 等它出现再操作。
 
 ## 拟人浏览示例（同步）
 ```python
@@ -38,16 +41,15 @@ with open_page() as page:                      # 新开一个页面（会显示�
 运行：`uv run --with playwright python research.py`
 （connect_over_cdp 只需 `playwright` 包，**不需要** `playwright install`。）
 
-## 多页 / 异步
+## 用 connect（复用默认页）
 ```python
-from chapi_browser import connect, human_pause
+from chapi_browser import connect, active_page, human_pause
 with connect() as ctx:            # 持久化 profile（含登录态）
-    page = ctx.new_page()
+    page = active_page(ctx)       # = ctx.pages[0]，复用默认页（别 new_page）
     # ...拟人交互，循环里 human_pause()...
-    page.close()                  # 只关自己开的页面；别 ctx.close()/browser.close()
+    # 不要 ctx.close()/browser.close()；结束后可 page.goto("about:blank") 让实时浏览器回到空白
 ```
-- 异步 `open_page_async / connect_async / human_goto_async / human_pause_async`：**仅用于不同站点/互不依赖**的目标；
-  **同一站点不要高并发**（看起来像机器人，也会触发封锁）。
+- 浏览器任务**顺序执行**最稳；CDP 下多页/并发不可靠（新页面无法导航），不要靠开多页提速。
 
 ## 安全约定（别弄坏共享浏览器）
 - **绝不** `browser.close()` / `context.close()`（会断连、清空已开页面、拖垮实时浏览器）。

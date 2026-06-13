@@ -1,9 +1,9 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { Activity, ChevronLeft, ChevronRight, Clock, Coins, Cpu } from 'lucide-react';
+import { Brain, ChevronLeft, ChevronRight, Clock, Coins, Cpu, MessageSquare, Wrench } from 'lucide-react';
 import type { AgentRunDTO } from '@chapi/shared';
 import { useStore } from '@/lib/store';
-import { cn, formatCost, formatDuration, formatTokens } from '@/lib/utils';
+import { cn, formatDuration, formatTokens } from '@/lib/utils';
 
 /**
  * Live "active time" that ticks each second while the AI is actively running and
@@ -234,9 +234,9 @@ export function MonitorCard() {
         </div>
         <div className="grid grid-cols-2 gap-2 text-xs">
           <Stat icon={<Clock size={13} />} label="运行耗时" value={formatDuration(liveMs)} />
-          <Stat icon={<Coins size={13} />} label="Token" value={formatTokens(usage?.totalTokens ?? 0)} />
-          <Stat icon={<Activity size={13} />} label="成本" value={formatCost(usage?.costUsd ?? 0)} />
-          <Stat icon={<Cpu size={13} />} label="代理" value={String(agents.length || 0)} />
+          <Stat icon={<MessageSquare size={13} />} label="Claude 调用" value={String(usage?.claudeCalls ?? 0)} />
+          <Stat icon={<Wrench size={13} />} label="工具调用" value={String(usage?.toolCallCount ?? 0)} />
+          <Stat icon={<Brain size={13} />} label="学习次数" value={String(usage?.learnings ?? 0)} />
         </div>
       </div>
 

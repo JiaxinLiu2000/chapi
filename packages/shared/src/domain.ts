@@ -89,6 +89,12 @@ export interface UsageDTO {
   costUsd: number;
   /** Wall-clock time the AI was actively running (excludes idle/HITL waits). */
   activeMs: number;
+  /** Total Claude turns/calls so far (sum of result.num_turns). */
+  claudeCalls: number;
+  /** Total tool invocations so far. */
+  toolCallCount: number;
+  /** Times knowledge was sedimented to the wiki (wiki_write). */
+  learnings: number;
 }
 
 export interface SessionDTO {
@@ -167,6 +173,8 @@ export interface AttachmentDTO {
   mime: string;
   size: number;
   createdAt: string;
+  /** Path of the sandbox copy, relative to the session sandbox cwd (e.g. "uploads/123-file.png"). */
+  sandboxPath?: string;
 }
 
 export interface WebPageDTO {

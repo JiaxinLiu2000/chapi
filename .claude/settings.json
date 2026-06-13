@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker start *)",
+      "Bash(docker exec *)",
+      "Bash(break)",
+      "Bash(pnpm --filter @chapi/server exec prisma db push)"
+    ]
+  }
+}

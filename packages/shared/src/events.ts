@@ -90,6 +90,11 @@ export type ServerEvent =
       sessionId: string;
     }
   | {
+      // Server asks the client to auto-collapse the live browser panel (all pages idle/blank).
+      type: 'browser.hide';
+      sessionId: string;
+    }
+  | {
       // Cross-session alert (delivered to ALL clients) so a background session's
       // question/approval/completion pops a notification even when it's not the
       // one being viewed.

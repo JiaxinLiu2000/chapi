@@ -18,6 +18,14 @@ export function useSessionSocket(sessionId: string | null): void {
           socket.send({ type: 'browser.view', sessionId, on: true });
         }
       }
+      // When all pages go idle/blank, auto-collapse the live view.
+      if (e.type === 'browser.hide' && e.sessionId === sessionId) {
+        const st = useStore.getState();
+        if (st.browserViewOn) {
+          st.setBrowserViewOn(false);
+          socket.send({ type: 'browser.view', sessionId, on: false });
+        }
+      }
     });
     socket.subscribe(sessionId);
     return () => {

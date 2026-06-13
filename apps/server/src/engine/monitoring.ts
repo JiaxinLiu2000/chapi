@@ -7,7 +7,7 @@ import type {
 import { prisma } from '../db/client.js';
 import { bus } from '../gateway/bus.js';
 import { createLogger } from '../logger.js';
-import { toAgentRunDTO, toPlanTaskDTO, toToolCallDTO } from '../mappers.js';
+import { sessionUsage, toAgentRunDTO, toPlanTaskDTO, toToolCallDTO } from '../mappers.js';
 import { preview } from './content.js';
 import { describeActivity } from './activity.js';
 
@@ -193,6 +193,16 @@ export class RunMonitor {
       },
     });
     this.tools.set(input.tool_use_id, call.id);
+
+    // Live monitor counters: total tool calls (+ "learnings" when writing the wiki).
+    const sess = await prisma.session.update({
+      where: { id: this.sessionId },
+      data: {
+        toolCallCount: { increment: 1 },
+        ...(input.tool_name === 'mcp__chapi__wiki_write' ? { learnings: { increment: 1 } } : {}),
+      },
+    });
+    bus.emit({ type: 'usage.updated', sessionId: this.sessionId, usage: sessionUsage(sess) });
 
     await prisma.agentRun.update({
       where: { id: agentRunId },

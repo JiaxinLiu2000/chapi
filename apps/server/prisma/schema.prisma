@@ -28,6 +28,9 @@ model Session {
   costUsd             Float    @default(0)
   activeMs            Int      @default(0)
   roundCount          Int      @default(0) // user turns, for 5-round summaries
+  claudeCalls         Int      @default(0) // total Claude turns/calls (sum of result.num_turns)
+  toolCallCount       Int      @default(0) // total tool invocations
+  learnings           Int      @default(0) // times knowledge was written to the wiki (wiki_write)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 

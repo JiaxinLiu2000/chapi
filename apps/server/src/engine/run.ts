@@ -253,6 +253,7 @@ export class Run {
       };
       total_cost_usd?: number;
       duration_ms?: number;
+      num_turns?: number;
     };
     const u = m.usage ?? {};
     const input = u.input_tokens ?? 0;
@@ -270,6 +271,8 @@ export class Run {
         totalTokens: { increment: input + output },
         costUsd: { increment: m.total_cost_usd ?? 0 },
         activeMs: { increment: m.duration_ms ?? 0 },
+        // "Claude 调用次数" — count the model turns this result reported (≥1 per turn).
+        claudeCalls: { increment: Math.max(1, m.num_turns ?? 1) },
       },
     });
     bus.emit({ type: 'usage.updated', sessionId: this.sessionId, usage: sessionUsage(updated) });
