@@ -16,6 +16,7 @@ model Session {
   model               String
   subagentModel       String   @default("") // per-session sub-agent / summary model ("" = global default)
   effort              String   @default("high") // low | medium | high | xhigh | max
+  language            String   @default("zh") // zh | en — language for talking to the user
   permissionProfile   String   @default("web") // web | vscode
   sdkSessionId        String? // Claude Agent SDK session id, for resume
   // usage / monitoring rollups
@@ -65,7 +66,8 @@ model AgentRun {
   session         Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   name            String // "main" or sub-agent name
   title           String?   @db.VarChar(300) // main: task title; sub: short task description
-  status          String    @default("running") // idle|running|done|error|interrupted
+  status          String    @default("running") // idle|running|done|error|interrupted|scheduled
+  scheduledFor    DateTime? // when a scheduled task fires (status='scheduled')
   currentTool     String?
   currentActivity String?   @db.Text
   inputTokens     Int       @default(0)
@@ -101,7 +103,7 @@ model PlanTask {
   session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   ordinal   Int
   text      String   @db.Text
-  status    String   @default("pending") // pending|in_progress|done|error
+  status    String   @default("pending") // pending|in_progress|done|failed|problem|replaced|blocked|error
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

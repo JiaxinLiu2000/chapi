@@ -59,6 +59,7 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
         maxSubagents: s.maxSubagents,
         enableBrowser: s.enableBrowser,
         browserHidden: s.browserHidden,
+        maxBrowserPages: s.maxBrowserPages,
       });
   }, [s]);
 
@@ -258,6 +259,17 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
               onChange={(e) => setForm((f) => ({ ...f, browserHidden: e.target.checked }))}
             />
             隐藏浏览器窗口（不在任务栏显示，仅在「实时浏览器」里查看）
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <span>实时浏览器最多页面</span>
+            <select
+              className="rounded-md border border-border bg-panel2 px-2 py-1 text-xs"
+              value={form.maxBrowserPages ?? 2}
+              onChange={(e) => setForm((f) => ({ ...f, maxBrowserPages: Number(e.target.value) }))}
+            >
+              <option value={1}>1（单页）</option>
+              <option value={2}>2（开第二页自动上下分屏）</option>
+            </select>
           </label>
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" className="text-xs" disabled={bBusy} onClick={browserLogin}>

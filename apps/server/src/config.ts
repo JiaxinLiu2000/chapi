@@ -31,6 +31,7 @@ const envSchema = z.object({
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
   GOOGLE_USER_EMAIL: z.string().optional(),
   MAX_SUBAGENTS: z.coerce.number().int().min(1).max(8).default(3),
+  MAX_BROWSER_PAGES: z.coerce.number().int().min(1).max(2).default(2),
 });
 
 const env = envSchema.parse(process.env);
@@ -58,6 +59,7 @@ export const config = {
   googleOAuthClientSecret: env.GOOGLE_OAUTH_CLIENT_SECRET,
   googleUserEmail: env.GOOGLE_USER_EMAIL,
   maxSubagents: env.MAX_SUBAGENTS,
+  maxBrowserPages: env.MAX_BROWSER_PAGES,
   paths: {
     repoRoot: REPO_ROOT,
     workspaces: abs(env.WORKSPACES_DIR),

@@ -21,6 +21,7 @@ import type {
   AttachmentDTO,
   ContentBlock,
   EffortLevel,
+  Language,
   MemorySummaryDTO,
   MessageDTO,
   MessageRole,
@@ -63,6 +64,7 @@ export function toSessionDTO(s: Session): SessionDTO {
     model: s.model,
     subagentModel: s.subagentModel || s.model,
     effort: s.effort as EffortLevel,
+    language: (s.language as Language) ?? 'zh',
     permissionProfile: s.permissionProfile as PermissionProfile,
     usage: sessionUsage(s),
     createdAt: isoReq(s.createdAt),
@@ -97,6 +99,7 @@ export function toAgentRunDTO(a: AgentRun): AgentRunDTO {
     startedAt: iso(a.startedAt),
     endedAt: iso(a.endedAt),
     elapsedMs: a.elapsedMs,
+    scheduledFor: iso(a.scheduledFor),
   };
 }
 

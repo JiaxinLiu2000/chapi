@@ -17,11 +17,25 @@ export const AGENT_RUN_STATUSES = [
   'done',
   'error',
   'interrupted',
+  'scheduled',
 ] as const;
 export type AgentRunStatus = (typeof AGENT_RUN_STATUSES)[number];
 
-export const PLAN_TASK_STATUSES = ['pending', 'in_progress', 'done', 'error'] as const;
+export const PLAN_TASK_STATUSES = [
+  'pending',
+  'in_progress',
+  'done',
+  'failed',
+  'problem',
+  'replaced',
+  'blocked',
+  'error', // legacy alias of replaced (kept for back-compat)
+] as const;
 export type PlanTaskStatus = (typeof PLAN_TASK_STATUSES)[number];
+
+/** UI language for talking to the user (outputs/research still default to English). */
+export const LANGUAGES = ['zh', 'en'] as const;
+export type Language = (typeof LANGUAGES)[number];
 
 export const MESSAGE_ROLES = ['user', 'assistant', 'tool', 'system'] as const;
 export type MessageRole = (typeof MESSAGE_ROLES)[number];
@@ -85,6 +99,7 @@ export interface SessionDTO {
   model: string;
   subagentModel: string;
   effort: EffortLevel;
+  language: Language;
   permissionProfile: PermissionProfile;
   usage: UsageDTO;
   createdAt: string;
@@ -121,6 +136,8 @@ export interface AgentRunDTO {
   endedAt: string | null;
   /** Active elapsed ms for this agent. */
   elapsedMs: number;
+  /** When a scheduled task will fire (status='scheduled'); drives the countdown. */
+  scheduledFor: string | null;
 }
 
 export interface ToolCallDTO {
@@ -240,4 +257,5 @@ export interface PublicSettingsDTO {
   enableBrowser: boolean;
   browserHidden: boolean;
   maxSubagents: number;
+  maxBrowserPages: number; // 1 or 2 live browser panes
 }

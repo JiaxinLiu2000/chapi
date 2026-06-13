@@ -32,12 +32,13 @@ export interface Orchestrator {
   /** Stop and drop a session's run (called before deleting the session). */
   abandon(sessionId: string): Promise<void>;
 
-  /** Switch the session's model (live), sub-agent model, and/or effort (next turn). */
+  /** Switch the session's model (live), sub-agent model, effort and/or language (next turn). */
   setConfig(
     sessionId: string,
     model?: string,
     effort?: string,
     subagentModel?: string,
+    language?: string,
   ): Promise<void>;
 
   /** True if a run is currently active for this session. */

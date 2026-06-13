@@ -60,6 +60,7 @@ export const updateSettingsSchema = z.object({
   enableBrowser: z.boolean().optional(),
   browserHidden: z.boolean().optional(),
   maxSubagents: z.number().int().min(1).max(8).optional(),
+  maxBrowserPages: z.number().int().min(1).max(2).optional(),
 });
 export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>;
 

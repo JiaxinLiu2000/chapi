@@ -71,12 +71,15 @@ export type ServerEvent =
       // Live cloakbrowser screencast frame (base64 JPEG) projected into the UI.
       type: 'browser.frame';
       sessionId: string;
+      page: number; // 0 or 1 (which pane)
       dataBase64: string;
       url: string | null;
     }
   | {
       type: 'browser.state';
       sessionId: string;
+      page: number; // 0 or 1
+      pageCount: number; // how many live panes (1 or 2)
       status: 'connecting' | 'connected' | 'disconnected' | 'unavailable';
       url: string | null;
       message?: string;
@@ -127,6 +130,7 @@ export const clientCommandSchema = z.discriminatedUnion('type', [
     model: z.string().min(1).optional(),
     subagentModel: z.string().min(1).optional(),
     effort: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional(),
+    language: z.enum(['zh', 'en']).optional(),
   }),
   z.object({ type: z.literal('ping') }),
 ]);

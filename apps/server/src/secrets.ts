@@ -19,6 +19,7 @@ const KEY_CANVA_ENABLED = 'canva_enabled';
 const KEY_BROWSER_ENABLED = 'browser_enabled';
 const KEY_BROWSER_HIDDEN = 'browser_hidden';
 const KEY_MAX_SUBAGENTS = 'max_subagents';
+const KEY_MAX_BROWSER_PAGES = 'max_browser_pages';
 
 const SECRET_KEYS = new Set([KEY_OPENAI, KEY_ANTHROPIC, KEY_GOOGLE_ID, KEY_GOOGLE_SECRET]);
 
@@ -142,6 +143,12 @@ class SettingsStore {
     return Number.isFinite(n) ? Math.min(8, Math.max(1, n)) : config.maxSubagents;
   }
 
+  async getMaxBrowserPages(): Promise<number> {
+    const raw = await this.readRaw(KEY_MAX_BROWSER_PAGES);
+    const n = raw ? Number.parseInt(raw, 10) : config.maxBrowserPages;
+    return Number.isFinite(n) ? Math.min(2, Math.max(1, n)) : config.maxBrowserPages;
+  }
+
   async getPublic(): Promise<PublicSettingsDTO> {
     const models = await this.getModels();
     const google = await this.getGoogleOAuth();
@@ -158,6 +165,7 @@ class SettingsStore {
       enableBrowser: await this.getBrowserEnabled(),
       browserHidden: await this.getBrowserHidden(),
       maxSubagents: await this.getMaxSubagents(),
+      maxBrowserPages: await this.getMaxBrowserPages(),
     };
   }
 
@@ -186,6 +194,10 @@ class SettingsStore {
       [
         KEY_MAX_SUBAGENTS,
         input.maxSubagents === undefined ? undefined : String(input.maxSubagents),
+      ],
+      [
+        KEY_MAX_BROWSER_PAGES,
+        input.maxBrowserPages === undefined ? undefined : String(input.maxBrowserPages),
       ],
     ];
     for (const [key, value] of entries) {

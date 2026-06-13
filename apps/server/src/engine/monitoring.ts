@@ -281,8 +281,13 @@ export class RunMonitor {
     }
 
     for (const t of existing) {
-      if (!incoming.has(t.text) && t.status !== 'done' && t.status !== 'error') {
-        await prisma.planTask.update({ where: { id: t.id }, data: { status: 'error' } });
+      if (
+        !incoming.has(t.text) &&
+        t.status !== 'done' &&
+        t.status !== 'replaced' &&
+        t.status !== 'error'
+      ) {
+        await prisma.planTask.update({ where: { id: t.id }, data: { status: 'replaced' } });
       }
     }
 

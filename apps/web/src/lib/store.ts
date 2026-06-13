@@ -22,6 +22,21 @@ export interface ToastNotification {
   ts: number;
 }
 
+export interface BrowserPaneState {
+  frame: string | null; // base64 jpeg
+  url: string | null;
+  status: 'idle' | 'connecting' | 'connected' | 'disconnected' | 'unavailable';
+  message: string | null;
+}
+
+const idlePane = (): BrowserPaneState => ({
+  frame: null,
+  url: null,
+  status: 'idle',
+  message: null,
+});
+const idlePanes = (): BrowserPaneState[] => [idlePane(), idlePane()];
+
 interface ChapiState {
   // session list (history)
   sessions: SessionDTO[];
@@ -42,10 +57,8 @@ interface ChapiState {
   toast: ToastNotification | null;
 
   // live cloakbrowser view
-  browserFrame: string | null; // base64 jpeg
-  browserUrl: string | null;
-  browserStatus: 'idle' | 'connecting' | 'connected' | 'disconnected' | 'unavailable';
-  browserMessage: string | null;
+  browserPages: BrowserPaneState[]; // up to 2 live panes
+  browserPageCount: number; // 1 or 2
   browserViewOn: boolean;
 
   setSessions: (s: SessionDTO[]) => void;
@@ -80,10 +93,8 @@ export const useStore = create<ChapiState>((set, get) => ({
   questions: [],
   approvals: [],
   toast: null,
-  browserFrame: null,
-  browserUrl: null,
-  browserStatus: 'idle',
-  browserMessage: null,
+  browserPages: idlePanes(),
+  browserPageCount: 1,
   browserViewOn: false,
 
   setSessions: (s) => set({ sessions: s }),
@@ -103,10 +114,8 @@ export const useStore = create<ChapiState>((set, get) => ({
       approvals: [],
       runState: 'idle',
       toolCalls: [],
-      browserFrame: null,
-      browserUrl: null,
-      browserStatus: 'idle',
-      browserMessage: null,
+      browserPages: idlePanes(),
+      browserPageCount: 1,
       browserViewOn: false,
     }),
 
@@ -124,10 +133,8 @@ export const useStore = create<ChapiState>((set, get) => ({
       runState: 'idle',
       questions: [],
       approvals: [],
-      browserFrame: null,
-      browserUrl: null,
-      browserStatus: 'idle',
-      browserMessage: null,
+      browserPages: idlePanes(),
+      browserPageCount: 1,
       browserViewOn: false,
     }),
 
@@ -240,15 +247,26 @@ export const useStore = create<ChapiState>((set, get) => ({
         break;
       case 'browser.frame':
         if (forActive(e.sessionId))
-          set((s) => ({ browserFrame: e.dataBase64, browserUrl: e.url ?? s.browserUrl }));
+          set((s) => {
+            const pages = s.browserPages.slice();
+            const prev = pages[e.page] ?? idlePane();
+            pages[e.page] = { ...prev, frame: e.dataBase64, url: e.url ?? prev.url };
+            return { browserPages: pages };
+          });
         break;
       case 'browser.state':
         if (forActive(e.sessionId))
-          set((s) => ({
-            browserStatus: e.status,
-            browserUrl: e.url ?? s.browserUrl,
-            browserMessage: e.message ?? null,
-          }));
+          set((s) => {
+            const pages = s.browserPages.slice();
+            const prev = pages[e.page] ?? idlePane();
+            pages[e.page] = {
+              ...prev,
+              status: e.status,
+              url: e.url ?? prev.url,
+              message: e.message ?? null,
+            };
+            return { browserPages: pages, browserPageCount: e.pageCount };
+          });
         break;
       case 'error':
         if (forActive(e.sessionId))

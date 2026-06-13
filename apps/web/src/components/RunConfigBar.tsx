@@ -1,5 +1,5 @@
 'use client';
-import { EFFORT_LEVELS, MODEL_OPTIONS, type EffortLevel } from '@chapi/shared';
+import { EFFORT_LEVELS, MODEL_OPTIONS, type EffortLevel, type Language } from '@chapi/shared';
 import { useStore } from '@/lib/store';
 import { getSocket } from '@/lib/ws';
 
@@ -19,8 +19,9 @@ export function RunConfigBar({ sessionId }: { sessionId: string }) {
   const completed = session?.status === 'completed';
   const model = session?.model ?? '';
   const effort: EffortLevel = session?.effort ?? 'high';
+  const language: Language = session?.language ?? 'zh';
 
-  const patch = (partial: { model?: string; effort?: EffortLevel }) =>
+  const patch = (partial: { model?: string; effort?: EffortLevel; language?: Language }) =>
     useStore.setState((s) => ({ session: s.session ? { ...s.session, ...partial } : s.session }));
 
   const onModel = (value: string) => {
@@ -30,6 +31,10 @@ export function RunConfigBar({ sessionId }: { sessionId: string }) {
   const onEffort = (value: EffortLevel) => {
     patch({ effort: value });
     getSocket().send({ type: 'set.config', sessionId, effort: value });
+  };
+  const onLanguage = (value: Language) => {
+    patch({ language: value });
+    getSocket().send({ type: 'set.config', sessionId, language: value });
   };
   const optionsFor = (cur: string) =>
     MODEL_OPTIONS.some((m) => m.id === cur)
@@ -74,6 +79,18 @@ export function RunConfigBar({ sessionId }: { sessionId: string }) {
             {effortLabel[e]}
           </option>
         ))}
+      </select>
+
+      <span className="ml-3 text-xs text-muted">语言</span>
+      <select
+        className={selectCls}
+        value={language}
+        disabled={completed}
+        onChange={(e) => onLanguage(e.target.value as Language)}
+        title="与用户交流的语言（表格/邮件/查资料仍默认英文）"
+      >
+        <option value="zh">中文</option>
+        <option value="en">English</option>
       </select>
 
       {/* hidden while the panel is open (the panel has its own close button) */}

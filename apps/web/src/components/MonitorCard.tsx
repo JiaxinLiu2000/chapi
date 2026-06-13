@@ -41,6 +41,18 @@ const runStateColor: Record<string, string> = {
   error: 'bg-danger',
 };
 
+// plan-task status -> icon
+const PLAN_ICON: Record<string, string> = {
+  pending: '⬜',
+  in_progress: '🔄',
+  done: '✅',
+  failed: '❗',
+  problem: '⚠️',
+  blocked: '⏸️',
+  replaced: '↩️',
+  error: '↩️',
+};
+
 // hard-coded tag -> color tone (matches server describeActivity tags)
 const TAG_TONE: Record<string, { bg: string; fg: string }> = {
   读取: { bg: '#1e3a5f', fg: '#7cc4ff' },
@@ -80,40 +92,66 @@ function TagChip({ tag }: { tag: string }) {
   );
 }
 
-function AgentRow({ a }: { a: AgentRunDTO }) {
+function AgentRow({ a, currentStage }: { a: AgentRunDTO; currentStage?: string | null }) {
   const isMain = a.name === 'main';
   const running = a.status === 'running';
+  const scheduled = a.status === 'scheduled';
+  // main agent shows the CURRENT plan stage; others show their task title
+  const subtitle = isMain ? (currentStage ?? a.title) : a.title;
+
+  // live countdown for scheduled tasks
+  const [, force] = useState(0);
+  useEffect(() => {
+    if (!scheduled) return;
+    const id = setInterval(() => force((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [scheduled]);
+  const remainSec =
+    scheduled && a.scheduledFor
+      ? Math.max(0, Math.ceil((new Date(a.scheduledFor).getTime() - Date.now()) / 1000))
+      : 0;
+
   return (
     <div className="rounded-lg border border-border bg-panel2 p-2.5">
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
-          <Cpu size={13} className={running ? 'text-success' : 'text-muted'} />
-          <span>{isMain ? '主代理' : '子代理'}</span>
-          {!isMain && <span className="truncate text-[10px] text-muted/60">{a.name}</span>}
+          <Cpu size={13} className={running || scheduled ? 'text-success' : 'text-muted'} />
+          <span>{isMain ? '主代理' : scheduled ? '定时检查' : '子代理'}</span>
+          {!isMain && !scheduled && <span className="truncate text-[10px] text-muted/60">{a.name}</span>}
         </div>
         <span
           className={cn(
             'flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px]',
-            running ? 'bg-success/20 text-success' : 'bg-border text-muted',
+            running
+              ? 'bg-success/20 text-success'
+              : scheduled
+                ? 'bg-amber-400/20 text-amber-400'
+                : 'bg-border text-muted',
           )}
         >
           {running && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" />}
           {running
             ? '运行中'
-            : a.status === 'idle'
-              ? '空闲'
-              : a.status === 'interrupted'
-                ? '已中断'
-                : a.status === 'error'
-                  ? '出错'
-                  : '已结束'}
+            : scheduled
+              ? '定时'
+              : a.status === 'idle'
+                ? '空闲'
+                : a.status === 'interrupted'
+                  ? '已中断'
+                  : a.status === 'error'
+                    ? '出错'
+                    : '已结束'}
         </span>
       </div>
 
-      {a.title && (
-        <div className="mt-1 line-clamp-2 text-xs leading-snug text-text/90" title={a.title}>
-          {a.title}
+      {subtitle && (
+        <div className="mt-1 line-clamp-2 text-xs leading-snug text-text/90" title={subtitle}>
+          {subtitle}
         </div>
+      )}
+
+      {scheduled && (
+        <div className="mt-1.5 text-[11px] font-medium text-amber-400">⏳ 还有 {remainSec}s 执行</div>
       )}
 
       {running && a.currentTool ? (
@@ -154,6 +192,7 @@ export function MonitorCard() {
   const approvals = useStore((s) => s.approvals);
 
   const done = plan.filter((t) => t.status === 'done').length;
+  const currentStage = plan.find((t) => t.status === 'in_progress')?.text ?? null;
   // tick while actively running; pause when idle or waiting on the user (HITL)
   const ticking = runState === 'running' && questions.length === 0 && approvals.length === 0;
   const liveMs = useLiveElapsed(usage?.activeMs ?? 0, ticking);
@@ -217,14 +256,14 @@ export function MonitorCard() {
           <ul className="space-y-1">
             {plan.map((t) => (
               <li key={t.id} className="flex items-start gap-1.5 text-sm">
-                <span className="mt-0.5">
-                  {t.status === 'done' ? '✅' : t.status === 'in_progress' ? '🔄' : t.status === 'error' ? '⚠️' : '⬜'}
-                </span>
+                <span className="mt-0.5">{PLAN_ICON[t.status] ?? '⬜'}</span>
                 <span
                   className={cn(
                     'leading-snug',
                     t.status === 'done' && 'text-muted',
-                    t.status === 'error' && 'text-muted line-through',
+                    t.status === 'failed' && 'text-danger',
+                    t.status === 'problem' && 'text-warn',
+                    (t.status === 'replaced' || t.status === 'error') && 'text-muted line-through',
                   )}
                 >
                   {t.text}
@@ -241,7 +280,7 @@ export function MonitorCard() {
           <div className="mb-1.5 px-1 text-xs font-semibold text-muted">代理状态</div>
           <div className="space-y-1.5">
             {agents.map((a) => (
-              <AgentRow key={a.id} a={a} />
+              <AgentRow key={a.id} a={a} currentStage={a.name === 'main' ? currentStage : null} />
             ))}
           </div>
         </div>

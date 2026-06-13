@@ -4,6 +4,22 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.24 — 工作流/提示/技能/监控/浏览器优化
+
+- **任务流（set_plan）**：新增工具，任何任务都建一个可见任务流；状态扩展为
+  done/in_progress/problem(黄)/failed(红❗)/replaced(划线)/blocked；可清空重建。系统提示要求"先建流"。
+  监控图标按状态区分。**主代理副标题改为显示当前进行中的步骤**（而非首条消息）。
+- **定时任务（schedule_task）**：延时执行会在监控显示一个"定时检查"代理 + **实时倒计时**，到点自动执行
+  （不再用 Bash sleep）；服务端重启会重载未触发的定时器。
+- **当前时间**：新增 `get_current_time` 工具，并在系统提示注入当前时间（本工作流看重时间）。
+- **语言**：每会话语言（中文/English，默认中文）选择器（在 effort 右侧）；交流用所选语言，
+  但表格/邮件/查资料默认英文（使用环境在美国）。
+- **批量优先写脚本**：系统提示 + 新技能 batch-scripting（先跑通→写脚本→小批测试+抽查→全量→抽查验收）。
+- **鼓励并行子代理**：互不依赖的耗时任务并行执行。
+- **实时浏览器最多 2 页**：`maxBrowserPages` 设置（默认 2）；浏览器开第二个页面时自动**上下分屏**各显示一页
+  （CDP 多 target 截屏）。
+- 技能 INDEX 补充上述新工具与"何时用"。**已实测**：set_plan/get_current_time/语言切换在线生效。
+
 ## v0.1.23
 
 - Resize: clamp the live-browser panel so it can no longer grow past the screen / squeeze the

@@ -1,15 +1,34 @@
 import { randomUUID } from 'node:crypto';
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
-import type { ArtifactDTO, ArtifactKind } from '@chapi/shared';
+import type { ArtifactDTO, ArtifactKind, PlanTaskStatus } from '@chapi/shared';
 import { prisma } from '../../db/client.js';
 import { bus } from '../../gateway/bus.js';
-import { toArtifactDTO, toPendingQuestionDTO } from '../../mappers.js';
+import { toArtifactDTO, toPendingQuestionDTO, toPlanTaskDTO } from '../../mappers.js';
 import { searchWiki, writeWikiEntry } from '../../rag/wiki.js';
 import { pdfEdit } from '../../tools/pdf.js';
 import { hitl } from '../hitl.js';
+import { scheduler } from '../scheduler.js';
 
 const text = (s: string) => ({ content: [{ type: 'text' as const, text: s }] });
+
+/** Replace the whole visible plan with the given ordered tasks, then broadcast. */
+export async function replaceSessionPlan(
+  sessionId: string,
+  tasks: Array<{ text: string; status?: PlanTaskStatus }>,
+): Promise<void> {
+  await prisma.planTask.deleteMany({ where: { sessionId } });
+  let ordinal = 0;
+  for (const t of tasks) {
+    const txt = (t.text ?? '').trim();
+    if (!txt) continue;
+    await prisma.planTask.create({
+      data: { sessionId, ordinal: ordinal++, text: txt, status: t.status ?? 'pending' },
+    });
+  }
+  const all = await prisma.planTask.findMany({ where: { sessionId }, orderBy: { ordinal: 'asc' } });
+  bus.emit({ type: 'plan.updated', sessionId, tasks: all.map(toPlanTaskDTO) });
+}
 
 /** Tool names exposed to the model (server name "chapi"). */
 export const CHAPI_TOOL_NAMES = [
@@ -20,6 +39,9 @@ export const CHAPI_TOOL_NAMES = [
   'mcp__chapi__wiki_search',
   'mcp__chapi__wiki_write',
   'mcp__chapi__pdf_edit',
+  'mcp__chapi__set_plan',
+  'mcp__chapi__schedule_task',
+  'mcp__chapi__get_current_time',
 ];
 
 /**
@@ -230,9 +252,67 @@ export function buildChapiToolServer(sessionId: string) {
     },
   );
 
+  const setPlan = tool(
+    'set_plan',
+    '创建/替换当前任务流（前端左侧实时展示）。无论任务大小都先建一个简单清单（哪怕 2-3 步）。每次调用整体替换整个清单。状态: pending(待办)|in_progress(进行中)|done(完成✅)|problem(遇到问题,黄)|failed(失败,红)|replaced(已换方案,划线)|blocked(受阻)。换方案时把旧步标 replaced 并加新步；用户开新/补充任务时整体重建或清空。',
+    {
+      tasks: z
+        .array(
+          z.object({
+            text: z.string(),
+            status: z
+              .enum(['pending', 'in_progress', 'done', 'failed', 'problem', 'replaced', 'blocked'])
+              .optional(),
+          }),
+        )
+        .describe('完整、有序的任务列表（含要划线保留的 replaced 步骤）'),
+    },
+    async (args) => {
+      await replaceSessionPlan(sessionId, args.tasks as Array<{ text: string; status?: PlanTaskStatus }>);
+      return text(`任务流已更新（${args.tasks.length} 项）`);
+    },
+  );
+
+  const scheduleTask = tool(
+    'schedule_task',
+    '安排一个定时任务：delaySeconds 秒后自动执行 description。左侧监控会出现一个"定时检查"代理并实时倒计时，到点自动在本会话执行。**不要用 Bash sleep 阻塞等待**，用本工具。',
+    {
+      delaySeconds: z.number().int().min(5).max(86400).describe('多少秒后执行（5s~24h）'),
+      description: z.string().describe('到点要做的事'),
+    },
+    async (args) => {
+      const at = await scheduler.schedule(sessionId, args.delaySeconds, args.description);
+      return text(`已安排定时任务：${args.delaySeconds}s 后（${at.toLocaleString()}）自动执行：${args.description}`);
+    },
+  );
+
+  const getCurrentTime = tool(
+    'get_current_time',
+    '获取当前日期与时间（本地 + UTC + 时区 + epoch）。本工作流很看重时间，需要时随时调用以拿到最新时间。',
+    {},
+    async () => {
+      const now = new Date();
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      return text(
+        `本地时间: ${now.toLocaleString()} (${tz})\nUTC ISO: ${now.toISOString()}\nepoch(ms): ${now.getTime()}`,
+      );
+    },
+  );
+
   return createSdkMcpServer({
     name: 'chapi',
     version: '0.1.0',
-    tools: [askUser, requestApproval, notifyUser, saveArtifact, wikiSearch, wikiWrite, pdfEditTool],
+    tools: [
+      askUser,
+      requestApproval,
+      notifyUser,
+      saveArtifact,
+      wikiSearch,
+      wikiWrite,
+      pdfEditTool,
+      setPlan,
+      scheduleTask,
+      getCurrentTime,
+    ],
   });
 }

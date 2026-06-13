@@ -131,18 +131,21 @@ export class SdkOrchestrator implements Orchestrator {
     model?: string,
     effort?: string,
     subagentModel?: string,
+    language?: string,
   ): Promise<void> {
-    const data: { model?: string; effort?: string; subagentModel?: string } = {};
+    const data: { model?: string; effort?: string; subagentModel?: string; language?: string } = {};
     if (model) data.model = model;
     if (effort) data.effort = effort;
     if (subagentModel) data.subagentModel = subagentModel;
+    if (language) data.language = language;
     if (Object.keys(data).length === 0) return;
 
     const updated = await prisma.session.update({ where: { id: sessionId }, data });
     const run = this.runs.get(sessionId);
     if (run) {
-      if (effort) {
-        // Effort can't change on a live query — restart on next message (resume keeps context).
+      if (effort || language) {
+        // effort/language are baked into the run at start — restart on next message
+        // (resume keeps context) so the new value takes effect.
         await run.stop().catch(() => undefined);
         this.runs.delete(sessionId);
       } else if (model) {
@@ -150,7 +153,9 @@ export class SdkOrchestrator implements Orchestrator {
       }
     }
     bus.emit({ type: 'session.updated', session: toSessionDTO(updated) });
-    log.info(`session ${sessionId} config → model=${updated.model} effort=${updated.effort}`);
+    log.info(
+      `session ${sessionId} config → model=${updated.model} effort=${updated.effort} lang=${updated.language}`,
+    );
   }
 
   async dispose(): Promise<void> {

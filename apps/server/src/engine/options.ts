@@ -6,7 +6,7 @@ import type {
   HookEvent,
   Options,
 } from '@anthropic-ai/claude-agent-sdk';
-import type { PermissionProfile } from '@chapi/shared';
+import type { Language, PermissionProfile } from '@chapi/shared';
 import { config, sessionPaths } from '../config.js';
 import { disallowedToolsFor } from './permissions.js';
 import { buildSystemPrompt } from './systemPrompt.js';
@@ -44,7 +44,13 @@ export function buildRunOptions(session: Session, deps: BuildOptionsDeps): Optio
     systemPrompt: {
       type: 'preset',
       preset: 'claude_code',
-      append: buildSystemPrompt(session.id, profile, deps.extraSystemContext, deps.maxSubagents),
+      append: buildSystemPrompt(
+        session.id,
+        profile,
+        deps.extraSystemContext,
+        deps.maxSubagents,
+        session.language as Language,
+      ),
     },
     canUseTool: deps.canUseTool,
     hooks: deps.hooks,
