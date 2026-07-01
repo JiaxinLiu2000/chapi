@@ -153,6 +153,30 @@ def _connect_cdp(pw):
     raise last if last else RuntimeError("connect_over_cdp failed")
 
 
+def _reset_autoattach(browser) -> None:
+    """Turn OFF browser-wide auto-attach before disconnecting.
+
+    connect_over_cdp makes Playwright enable Target.setAutoAttach with
+    waitForDebuggerOnStart=true — so every NEW tab/navigation is frozen until the
+    debugger resumes it. If we disconnect (or just sit idle) leaving that on, the
+    user's MANUAL browsing hangs forever on "loading". Clearing it leaves the shared
+    browser usable by hand.
+    """
+    try:
+        s = browser.new_browser_cdp_session()
+        s.send("Target.setAutoAttach", {"autoAttach": False, "waitForDebuggerOnStart": False, "flatten": True})
+    except Exception:
+        pass
+
+
+async def _reset_autoattach_async(browser) -> None:
+    try:
+        s = await browser.new_browser_cdp_session()
+        await s.send("Target.setAutoAttach", {"autoAttach": False, "waitForDebuggerOnStart": False, "flatten": True})
+    except Exception:
+        pass
+
+
 # ───────────────────────── 拟人操作助手（同步） ─────────────────────────
 
 def human_pause(min_s: float = 0.6, max_s: float = 2.4) -> None:
@@ -352,6 +376,7 @@ def connect(*, default_timeout_ms: int = 45000):
                         pass
             except Exception:
                 pass
+            _reset_autoattach(browser)  # 让浏览器恢复"可手动使用"，否则新标签会一直卡在加载
 
 
 @contextmanager
@@ -384,6 +409,30 @@ def open_page(url: str | None = None, *, wait_until: str = "domcontentloaded", t
                     page.goto(_BLANK)  # 回到空白页 → 实时浏览器视为闲置
             except Exception:
                 pass
+            _reset_autoattach(browser)  # 让浏览器恢复"可手动使用"，否则新标签会一直卡在加载
+
+
+def open_login(url: str, *, wait_until: str = "domcontentloaded") -> None:
+    """给用户手动登录用：打开登录页 → **立即断开自动化并清掉 auto-attach** → 返回。
+
+    关键：需要用户登录时，**不要**用 open_page/connect 长时间占着浏览器等他登录——那样浏览器处于
+    自动化控制下，用户开任何新标签都会一直"加载中"。正确流程：
+      1) open_login("https://…登录页")
+      2) ask_user("请在浏览器里登录，完成后回复我")   ← 期间浏览器完全交给用户，可自由操作
+      3) 用户回复后，再 open_page/connect 继续（登录态已存在持久化 profile）。
+    """
+    from playwright.sync_api import sync_playwright
+
+    with _hold_lock(), sync_playwright() as pw:
+        browser = _connect_cdp(pw)
+        ctx = _pick_context(browser)
+        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        try:
+            page.goto(url, wait_until=wait_until, timeout=45000)
+        except Exception:
+            pass
+        _reset_autoattach(browser)
+    # 退出即断开：登录页留在浏览器里，用户可正常操作（不被自动化冻结）。
 
 
 def fetch_html(url: str, *, wait_until: str = "domcontentloaded", timeout_ms: int = 45000) -> str:
@@ -435,6 +484,7 @@ async def open_page_async(url: str | None = None, *, wait_until: str = "domconte
                         await page.goto(_BLANK)
                 except Exception:
                     pass
+                await _reset_autoattach_async(browser)
     finally:
         _lk.release()
 

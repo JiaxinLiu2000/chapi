@@ -72,9 +72,20 @@ with connect() as ctx:
 - 只 `page.close()` 你自己开的页面。
 - 自检连接：`uv run --with playwright python chapi_browser.py https://example.com`。
 
-## 登录
-- cloakbrowser 用**专用持久化 profile**。目标站点需登录而未登录时，调用 `ask_user` 请用户在浏览器窗口
-  完成一次登录（登录态持久保存、后续脚本自动复用）。
+## 登录（需要用户手动登录时——务必按此，否则用户浏览器会卡死）
+cloakbrowser 用**专用持久化 profile**，登录态持久保存、后续脚本自动复用。需要用户登录时：
+
+1. **`open_login("https://…登录页")`**：打开登录页后**立即断开自动化**（清掉 Playwright 的 auto-attach）。
+2. **`ask_user("请在浏览器里登录，完成后回复我")`**：期间浏览器**完全交给用户**，可自由操作/开新标签。
+3. 用户回复后，再 `open_page`/`connect` 继续（此时已登录）。
+
+```python
+from chapi_browser import open_login
+open_login("https://accounts.google.com/")   # 打开并放手；随后调用 ask_user 等用户完成
+```
+
+⚠️ **绝不要**用 `open_page`/`connect` 打开登录页后**一直占着**浏览器等用户登录——那样浏览器处于自动化
+（auto-attach）控制下，用户开任何新标签都会**一直"加载中"卡死**。必须先 `open_login` 放手。
 
 ## 失败回退
 - 被风控/验证码：见铁律第 5 条，**停手**别硬刚。

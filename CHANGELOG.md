@@ -4,6 +4,18 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.42 — 修复"登录后手动访问任何网站都一直加载"
+
+- **根因**：任务等待你登录时，代理的 Playwright(connect_over_cdp)会话仍控制着浏览器。connect_over_cdp
+  会开启浏览器级 `Target.setAutoAttach(waitForDebuggerOnStart)`——**每个新标签/导航都会被冻结、等调试器恢复**。
+  任务挂起等你登录期间，你手动打开的网站就一直卡在"加载中"。
+- **修复**：
+  - 每次 `connect()`/`open_page()` 收尾（断开前）都**关掉浏览器级 auto-attach**（`Target.setAutoAttach:false`），
+    让浏览器恢复"可手动使用"，脚本结束后手动浏览不再被冻结。
+  - 新增 **`open_login(url)`**：打开登录页 → **立即断开自动化并清 auto-attach** → 返回。配套流程写进技能/提示：
+    需要用户登录时**先 `open_login` 放手，再 `ask_user` 等登录**，**绝不**用 open_page/connect 占着浏览器等。
+- **恢复当前卡死**：设置里把「浏览器」关掉再打开（重启 cloakbrowser）即可；登录态(cookie)保留。
+
 ## v0.1.41 — connect() 收尾不再误关用户手动打开的标签
 
 - `chapi_browser.connect()` 收尾时**只关本会话新开的标签**（之前会关掉所有多余标签），保留用户/既有标签——
