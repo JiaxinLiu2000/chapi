@@ -4,6 +4,18 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.40 — 启动更耐受 Docker 冷启动（不再因连不上 DB 就退出）
+
+- **问题**：刚"启动 Docker Desktop"后一键启动，容器内部 healthcheck 已 healthy，但 Docker/WSL2 的**宿主端口
+  3307 转发**还没就绪，服务端连了 ~88s 仍 ECONNREFUSED，`waitForDb` 用尽 30 次重试后**致命退出**（整个后端挂掉）。
+- **修复**：
+  - `waitForDb` 改为**按时限重试**（默认最多 180s、每 1.5s 一次，期间每 10 次打一条等待日志），覆盖 Docker
+    冷启动的端口转发延迟，不再过早放弃。
+  - 一键启动器在"容器 healthy"之后，**再等宿主端口 3307 真正可 TCP 连接**（最多 90s）才做 schema push /
+    启动后端——避免它们过早撞上 ECONNREFUSED。
+- 注：日志里另一个 `chachapi`（端口 8787/5173、MySQL 3306）是**另一个项目**，其 `/api/interrupt` 报错与本项目无关
+  （本项目早在 v0.1.12 已修复空 JSON body）。
+
 ## v0.1.39 — 历史记录下拉改版（可扩展到上百条）
 
 - 历史下拉加**搜索框**（按标题过滤）+ **状态筛选**（全部/进行中/已归档，各带计数）。

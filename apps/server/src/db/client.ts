@@ -8,19 +8,28 @@ const log = createLogger('db');
 export const prisma = new PrismaClient();
 
 /**
- * Block until the DB accepts queries. The server can boot a hair before MySQL is
- * ready to accept connections (even after the launcher's healthcheck), and the
- * very first query would otherwise throw an init error and crash startup.
+ * Block until the DB accepts queries, retrying until `maxWaitMs` elapses. MySQL's
+ * container can report "healthy" (internal check) well before Docker Desktop's HOST
+ * port forwarding is ready — especially right after Docker cold-starts — so the
+ * host-side connection can be refused for a couple of minutes. Wait it out instead
+ * of crashing startup.
  */
-export async function waitForDb(attempts = 30, delayMs = 1000): Promise<void> {
-  for (let i = 1; i <= attempts; i++) {
+export async function waitForDb(maxWaitMs = 180000, delayMs = 1500): Promise<void> {
+  const deadline = Date.now() + maxWaitMs;
+  let attempt = 0;
+  for (;;) {
+    attempt++;
     try {
       await prisma.$queryRaw`SELECT 1`;
-      if (i > 1) log.info(`database reachable after ${i} attempt(s)`);
+      if (attempt > 1) log.info(`database reachable after ${attempt} attempt(s)`);
       return;
     } catch (err) {
-      if (i === attempts) throw err;
-      if (i === 1) log.warn('waiting for database to become reachable…');
+      if (Date.now() >= deadline) throw err;
+      if (attempt === 1) {
+        log.warn('waiting for database (Docker/WSL2 host port forwarding can lag on cold start)…');
+      } else if (attempt % 10 === 0) {
+        log.warn(`still waiting for database… (${attempt} tries)`);
+      }
       await new Promise((r) => setTimeout(r, delayMs));
     }
   }

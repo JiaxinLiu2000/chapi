@@ -4,12 +4,29 @@
 // terminated, or a child crashes.
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const isWin = process.platform === 'win32';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Can we actually open a TCP connection to host:port? (The container can be
+ * "healthy" internally before Docker's HOST port forwarding is ready.) */
+function tcpOpen(host, port, timeoutMs = 1500) {
+  return new Promise((resolve) => {
+    const s = net.connect({ host, port });
+    const done = (ok) => {
+      s.destroy();
+      resolve(ok);
+    };
+    s.setTimeout(timeoutMs);
+    s.once('connect', () => done(true));
+    s.once('error', () => resolve(false));
+    s.once('timeout', () => done(false));
+  });
+}
 const tag = (t, m) => console.log(`\x1b[2m[${t}]\x1b[0m ${m}`);
 const DATABASE_URL = process.env.DATABASE_URL || 'mysql://chapi:chapi@127.0.0.1:3307/chapi';
 
@@ -89,6 +106,20 @@ async function main() {
     await sleep(2000);
   }
   tag('db', healthy ? 'MySQL healthy ✓' : 'MySQL not healthy yet (continuing)');
+
+  // "healthy" is the container-internal check; the HOST port (3307) forwarding can
+  // still lag right after Docker Desktop cold-starts. Wait for a real TCP connect
+  // so schema push + the server don't hit ECONNREFUSED.
+  tag('db', 'waiting for host port 3307…');
+  let portUp = false;
+  for (let i = 0; i < 90; i++) {
+    if (await tcpOpen('127.0.0.1', 3307)) {
+      portUp = true;
+      break;
+    }
+    await sleep(1000);
+  }
+  tag('db', portUp ? 'host port 3307 reachable ✓' : 'host port 3307 still not reachable (continuing)');
 
   tag('db', 'ensuring schema (prisma db push)…');
   spawnSync('pnpm', ['--filter', '@chapi/server', 'exec', 'prisma', 'db', 'push', '--skip-generate'], {
