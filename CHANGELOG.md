@@ -4,6 +4,11 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.41 — connect() 收尾不再误关用户手动打开的标签
+
+- `chapi_browser.connect()` 收尾时**只关本会话新开的标签**（之前会关掉所有多余标签），保留用户/既有标签——
+  避免代理任务在你手动浏览时把你打开的页面（如 Google 登录页）误关。默认页仍回到空白以便闲置收起。
+
 ## v0.1.40 — 启动更耐受 Docker 冷启动（不再因连不上 DB 就退出）
 
 - **问题**：刚"启动 Docker Desktop"后一键启动，容器内部 healthcheck 已 healthy，但 Docker/WSL2 的**宿主端口

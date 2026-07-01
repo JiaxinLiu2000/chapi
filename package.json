@@ -1,6 +1,6 @@
 {
   "name": "chapi",
-  "version": "0.1.40",
+  "version": "0.1.41",
   "private": true,
   "description": "Local web platform to drive Claude Code through natural language workflows",
   "type": "module",

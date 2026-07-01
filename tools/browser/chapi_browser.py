@@ -332,21 +332,22 @@ def connect(*, default_timeout_ms: int = 45000):
             ctx.set_default_timeout(default_timeout_ms)
         except Exception:
             pass
+        initial = list(ctx.pages)  # tabs that already existed (e.g. the user's own)
         try:
             yield ctx
         finally:
-            # 收尾：关掉多开的标签、默认页回到空白 → 闲置后实时浏览器自动收起。
-            # （绝不 browser.close()/ctx.close()。）
+            # 收尾：只关**本会话新开**的标签（保留用户/既有标签，别误关手动打开的页，如 Google 登录页）；
+            # 默认页回到空白 → 闲置后实时浏览器自动收起。（绝不 browser.close()/ctx.close()。）
             try:
-                pages = list(ctx.pages)
-                for p in pages[1:]:
+                for p in list(ctx.pages):
+                    if p not in initial:
+                        try:
+                            p.close()
+                        except Exception:
+                            pass
+                if initial:
                     try:
-                        p.close()
-                    except Exception:
-                        pass
-                if pages:
-                    try:
-                        pages[0].goto(_BLANK)
+                        initial[0].goto(_BLANK)
                     except Exception:
                         pass
             except Exception:
