@@ -4,6 +4,24 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.43 — 主页也能带文件/图片开新任务
+
+- **主页输入框支持附件**：回形针选择、**拖入整块输入区**（描边高亮 + "松手即可添加文件"）、
+  **Cmd/Ctrl+V 直接粘贴截图**。图片显示缩略图，其他文件显示带类型图标的 chip（含大小）。
+  只丢文件、不写字也能发起任务（标题取首个文件名）。
+- **上传时机**：主页在会话创建后才存在 sessionId，所以附件先留在本地（`URL.createObjectURL` 出预览），
+  按下发送时才 `建会话 → 上传 → 拼消息 → 跳转`。不产生空会话，后端无新增端点。
+  上传失败会把刚建的空会话删掉并留在主页，附件还在，可直接重试。
+- **会话页输入框同步升级**：与主页共用 `useAttachmentDraft` + `AttachmentTray`，同样支持拖拽/粘贴/缩略图。
+  顺带修掉一个旧毛病——之前"选中即上传"，用户再点 ✕ 移除时文件已落盘且 `Attachment` 表留了孤儿记录；
+  现在改为发送时才上传。
+- **修复：同名文件互相覆盖**。上传落盘名原为 `Date.now()-文件名`，同一请求内多个同名文件若落在同一毫秒会
+  生成相同路径，后者覆盖前者、而两条数据库记录都指向它。粘贴截图全叫 `image.png`，这条路从"极少触发"变成主路径，
+  故加入 4 位随机串。
+- **修复：中文文件名被抹平**。文件名清洗用的 `[^\w.\-]` 中 `\w` 只匹配 ASCII，`报价单.pdf` 会变成 `___.pdf`；
+  改用 `\p{L}\p{N}` 保留各种文字。
+- 客户端限额与服务端 multipart 对齐（单文件 100MB、单次 10 个），超限当场提示而不是传到一半失败。
+
 ## v0.1.42 — 修复"登录后手动访问任何网站都一直加载"
 
 - **根因**：任务等待你登录时，代理的 Playwright(connect_over_cdp)会话仍控制着浏览器。connect_over_cdp

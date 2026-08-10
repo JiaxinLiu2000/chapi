@@ -1,8 +1,12 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowUp, Sparkles } from 'lucide-react';
+import { ArrowUp, Paperclip, Sparkles } from 'lucide-react';
 import { api } from '@/lib/api';
+import { AttachmentTray } from '@/components/AttachmentTray';
+import { useAttachmentDraft } from '@/hooks/useAttachmentDraft';
+import { useStore } from '@/lib/store';
+import { cn, withAttachmentNote } from '@/lib/utils';
 
 const EXAMPLES = [
   '在网上调研竞品定价，整理成一份对比表格放进 Google Sheet',
@@ -14,24 +18,49 @@ export default function HomePage() {
   const router = useRouter();
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  const draft = useAttachmentDraft();
 
   const start = async (msg: string) => {
     const trimmed = msg.trim();
-    if (!trimmed || busy) return;
+    if (busy || (!trimmed && draft.items.length === 0)) return;
     setBusy(true);
+    // With files but no prose, the first filename is the most useful title seed.
+    const seed = trimmed || draft.items[0]?.file.name || '新任务';
     try {
       // ask for desktop notifications up front
       if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission().catch(() => undefined);
       }
-      const { session } = await api.createSession(trimmed);
-      sessionStorage.setItem(`chapi:pending:${session.id}`, trimmed);
+      const { session } = await api.createSession(seed);
+
+      let uploaded;
+      try {
+        uploaded = await draft.uploadAll(session.id);
+      } catch (e) {
+        // The session has no messages yet, so drop it rather than strand an
+        // empty one; the draft stays put so the user can just hit send again.
+        await api.deleteSession(session.id).catch(() => undefined);
+        throw e;
+      }
+
+      const full = withAttachmentNote(trimmed, uploaded);
+      sessionStorage.setItem(`chapi:pending:${session.id}`, full);
+      draft.clear();
       router.push(`/s/${session.slug}`);
     } catch (e) {
       setBusy(false);
-      alert(e instanceof Error ? e.message : '创建会话失败');
+      useStore.setState({
+        toast: {
+          level: 'error',
+          title: '创建会话失败',
+          body: e instanceof Error ? e.message : String(e),
+          ts: Date.now(),
+        },
+      });
     }
   };
+
+  const canSend = !busy && (text.trim().length > 0 || draft.items.length > 0);
 
   return (
     <main className="mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-2xl flex-col items-center justify-center px-4">
@@ -45,11 +74,26 @@ export default function HomePage() {
         </p>
       </div>
 
-      <div className="w-full rounded-2xl border border-border bg-panel p-2 shadow-xl">
+      <div
+        {...draft.dropProps}
+        className={cn(
+          'relative w-full rounded-2xl border bg-panel p-2 shadow-xl transition',
+          draft.dragActive ? 'border-accent ring-2 ring-accent/30' : 'border-border',
+        )}
+      >
+        {draft.dragActive && (
+          <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center rounded-2xl bg-panel/90 text-sm text-accent">
+            松手即可添加文件
+          </div>
+        )}
+
+        <AttachmentTray items={draft.items} onRemove={draft.remove} disabled={busy} />
+
         <textarea
           autoFocus
           value={text}
           onChange={(e) => setText(e.target.value)}
+          onPaste={draft.onPaste}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
@@ -57,17 +101,35 @@ export default function HomePage() {
             }
           }}
           rows={3}
-          placeholder="例如：在网上查找最新的行业报告并总结成文档…"
+          placeholder="例如：在网上查找最新的行业报告并总结成文档…（可拖入或粘贴文件、截图）"
           className="max-h-60 w-full resize-none bg-transparent px-3 py-2 text-[15px] outline-none placeholder:text-muted/60"
         />
-        <div className="flex justify-end p-1">
+        <div className="flex items-center justify-between p-1">
           <button
-            onClick={() => void start(text)}
-            disabled={busy || !text.trim()}
-            className="grid h-9 w-9 place-items-center rounded-xl bg-accent text-white transition hover:brightness-110 disabled:opacity-40"
+            onClick={draft.openPicker}
+            disabled={busy}
+            className="rounded-lg p-2 text-muted transition hover:bg-panel2 hover:text-text disabled:opacity-50"
+            title="添加文件/图片"
           >
-            <ArrowUp size={18} />
+            <Paperclip size={18} />
           </button>
+          <input
+            ref={draft.inputRef}
+            type="file"
+            multiple
+            hidden
+            onChange={draft.onInputChange}
+          />
+          <div className="flex items-center gap-2">
+            {busy && draft.uploading && <span className="text-xs text-muted">上传中…</span>}
+            <button
+              onClick={() => void start(text)}
+              disabled={!canSend}
+              className="grid h-9 w-9 place-items-center rounded-xl bg-accent text-white transition hover:brightness-110 disabled:opacity-40"
+            >
+              <ArrowUp size={18} />
+            </button>
+          </div>
         </div>
       </div>
 

@@ -5,6 +5,19 @@ import type { FastifyInstance } from 'fastify';
 import { config, sessionPaths } from '../../config.js';
 import { prisma } from '../../db/client.js';
 import { toAttachmentDTO } from '../../mappers.js';
+import { shortId } from '../../util/ids.js';
+
+/**
+ * Strip anything path-ish or shell-ish while keeping letters of any script —
+ * `\w` is ASCII-only, so it would flatten "报价单.pdf" to "___.pdf".
+ */
+function safeFilename(filename: string): string {
+  const cleaned = path
+    .basename(filename)
+    .replace(/[^\p{L}\p{N}._-]+/gu, '_')
+    .replace(/^\.+/, '');
+  return cleaned || 'file';
+}
 
 /**
  * Uploaded files land in the shared "raw materials" area (read-only reference)
@@ -28,8 +41,10 @@ export async function uploadRoutes(app: FastifyInstance): Promise<void> {
       const created = [];
       const parts = req.files();
       for await (const part of parts) {
-        const safeName = path.basename(part.filename).replace(/[^\w.\-]+/g, '_');
-        const fname = `${Date.now()}-${safeName}`;
+        // A bare timestamp collides when several same-named files (e.g. pasted
+        // screenshots) land inside the same millisecond, silently overwriting
+        // the earlier one — the random token keeps each upload distinct.
+        const fname = `${Date.now()}-${shortId(4)}-${safeFilename(part.filename)}`;
         const dest = path.join(rawDir, fname);
         await pipeline(part.file, fs.createWriteStream(dest));
         const size = (await fs.promises.stat(dest)).size;
