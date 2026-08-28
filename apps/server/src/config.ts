@@ -18,7 +18,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string().default('mysql://chapi:chapi@127.0.0.1:3307/chapi'),
   SECRETS_KEY: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
-  MAIN_MODEL: z.string().default('claude-opus-4-8'),
+  MAIN_MODEL: z.string().default('claude-sonnet-4-6'),
   SUBAGENT_MODEL: z.string().default('claude-sonnet-4-6'),
   OPENAI_API_KEY: z.string().optional(),
   EMBEDDING_MODEL: z.string().default('text-embedding-3-small'),

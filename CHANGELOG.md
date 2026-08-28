@@ -4,6 +4,14 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.44 — 主代理默认改用 Sonnet 4.6（省成本）
+
+- 主编排代理默认模型 **Opus 4.8 → Sonnet 4.6**，effort 保持 **high**。Sonnet 4.6 单价比 Opus 4.8 便宜约 **40%**
+  （输入 $5→$3、输出 $25→$15 /1M）——省的是**每 token 成本**，不是 token 数量。子代理本就是 Sonnet 4.6。
+- 改动：`config.ts` 的 `MAIN_MODEL` 出厂默认改为 `claude-sonnet-4-6`，并同步更新 DB 里的 `main_model` 设置（即时生效）。
+- 说明：既有会话仍保留各自创建时的模型，可在顶栏下拉逐个切换；新会话即用 Sonnet 4.6。取舍：Sonnet 比 Opus
+  规划/长链路 agentic 能力略弱，复杂任务偶尔多绕几轮。
+
 ## v0.1.43 — 主页也能带文件/图片开新任务
 
 - **主页输入框支持附件**：回形针选择、**拖入整块输入区**（描边高亮 + "松手即可添加文件"）、
