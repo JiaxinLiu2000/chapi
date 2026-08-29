@@ -15,7 +15,7 @@ model Session {
   status              String   @default("active") // active | completed | deleted
   model               String
   subagentModel       String   @default("") // per-session sub-agent / summary model ("" = global default)
-  effort              String   @default("high") // low | medium | high | xhigh | max
+  effort              String   @default("max") // low | medium | high | xhigh | max
   language            String   @default("zh") // zh | en — language for talking to the user
   permissionProfile   String   @default("web") // web | vscode
   sdkSessionId        String? // Claude Agent SDK session id, for resume

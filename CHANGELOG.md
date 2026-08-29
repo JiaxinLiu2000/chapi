@@ -4,6 +4,11 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.45 — 默认 effort 改为 max
+
+- 新会话默认 effort **high → max**（`Session.effort` 列默认值，已 db push 生效）。max 让模型思考更充分、质量更高，
+  但**用更多 token、更贵**——会部分抵消上一版换 Sonnet 省下的成本。既有会话不变，可在顶栏下拉逐个切换。
+
 ## v0.1.44 — 主代理默认改用 Sonnet 4.6（省成本）
 
 - 主编排代理默认模型 **Opus 4.8 → Sonnet 4.6**，effort 保持 **high**。Sonnet 4.6 单价比 Opus 4.8 便宜约 **40%**
