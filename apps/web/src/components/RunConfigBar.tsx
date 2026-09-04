@@ -18,15 +18,24 @@ export function RunConfigBar({ sessionId }: { sessionId: string }) {
   const session = useStore((s) => s.session);
   const completed = session?.status === 'completed';
   const model = session?.model ?? '';
+  const subagentModel = session?.subagentModel || model;
   const effort: EffortLevel = session?.effort ?? 'high';
   const language: Language = session?.language ?? 'zh';
 
-  const patch = (partial: { model?: string; effort?: EffortLevel; language?: Language }) =>
-    useStore.setState((s) => ({ session: s.session ? { ...s.session, ...partial } : s.session }));
+  const patch = (partial: {
+    model?: string;
+    subagentModel?: string;
+    effort?: EffortLevel;
+    language?: Language;
+  }) => useStore.setState((s) => ({ session: s.session ? { ...s.session, ...partial } : s.session }));
 
   const onModel = (value: string) => {
     patch({ model: value });
     getSocket().send({ type: 'set.config', sessionId, model: value });
+  };
+  const onSubModel = (value: string) => {
+    patch({ subagentModel: value });
+    getSocket().send({ type: 'set.config', sessionId, subagentModel: value });
   };
   const onEffort = (value: EffortLevel) => {
     patch({ effort: value });
@@ -50,16 +59,31 @@ export function RunConfigBar({ sessionId }: { sessionId: string }) {
   };
 
   return (
-    <div className="flex items-center gap-2 border-b border-border bg-panel/40 px-4 py-2">
-      <span className="text-xs text-muted">模型</span>
+    <div className="flex flex-wrap items-center gap-2 border-b border-border bg-panel/40 px-4 py-2">
+      <span className="text-xs text-muted">主代理</span>
       <select
         className={selectCls}
         value={model}
         disabled={completed}
         onChange={(e) => onModel(e.target.value)}
-        title="模型（主代理与子代理统一使用，即时生效）"
+        title="主编排代理的模型（即时生效）"
       >
         {optionsFor(model).map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.label}
+          </option>
+        ))}
+      </select>
+
+      <span className="ml-3 text-xs text-muted">子代理</span>
+      <select
+        className={selectCls}
+        value={subagentModel}
+        disabled={completed}
+        onChange={(e) => onSubModel(e.target.value)}
+        title="子代理（Task 派发）的模型（下一条消息生效）"
+      >
+        {optionsFor(subagentModel).map((m) => (
           <option key={m.id} value={m.id}>
             {m.label}
           </option>

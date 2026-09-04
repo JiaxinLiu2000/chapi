@@ -5,4 +5,4 @@
  * Convention: bump the PATCH (third) digit on every code update, and use the
  * same vX.Y.Z in the commit message.
  */
-export const APP_VERSION = '0.1.45';
+export const APP_VERSION = '0.1.46';

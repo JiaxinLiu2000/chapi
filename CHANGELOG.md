@@ -4,6 +4,14 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.46 — 任务栏可分别调主代理/子代理模型（子模型真正生效）
+
+- 顶部配置栏把原来的单个「模型」拆成**主代理**和**子代理**两个下拉（各含全部可选模型 Opus 4.8 / Sonnet 4.6 /
+  Haiku 4.5），外加原有的**思考强度**（low/medium/high/xhigh/max）和**语言**（中文/English）。
+- **子代理模型真正生效**（此前只存不用）：当子代理模型与主代理不同，运行时通过 SDK `agents` 覆盖
+  `general-purpose`（`AgentDefinition.model`）让 Task 派发的子代理用该模型；相同则继承主模型（行为不变）。
+- 子代理模型改动会在**下一条消息**重启当前 run 生效（与 effort/语言一致，resume 保留上下文）；主代理模型仍即时切换。
+
 ## v0.1.45 — 默认 effort 改为 max
 
 - 新会话默认 effort **high → max**（`Session.effort` 列默认值，已 db push 生效）。max 让模型思考更充分、质量更高，

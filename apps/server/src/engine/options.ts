@@ -31,8 +31,26 @@ export function buildRunOptions(session: Session, deps: BuildOptionsDeps): Optio
   const sp = sessionPaths(session.id);
   const profile = session.permissionProfile as PermissionProfile;
 
+  // Sub-agent model: only override the built-in general-purpose agent when the
+  // session's sub-agent model differs from the main model — otherwise inherit the
+  // SDK's default (best behavior). AgentDefinition.model applies to Task workers.
+  const subModel = (session.subagentModel || '').trim();
+  const agents: Options['agents'] | undefined =
+    subModel && subModel !== session.model
+      ? {
+          'general-purpose': {
+            description:
+              'General-purpose subagent for delegated tasks (research, browsing, batch scripts, file ops).',
+            prompt:
+              '你是被主代理派发来独立完成一个具体子任务的通用子代理。自主、彻底地完成任务（可用全部工具），完成后用简洁要点回报结果与产出位置。',
+            model: subModel, // run sub-agents on the session's chosen sub-agent model
+          },
+        }
+      : undefined;
+
   return {
     model: session.model,
+    ...(agents ? { agents } : {}),
     effort: session.effort as EffortLevel,
     cwd: sp.sandbox,
     additionalDirectories: [

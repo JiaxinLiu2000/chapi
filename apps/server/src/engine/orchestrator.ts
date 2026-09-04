@@ -143,9 +143,9 @@ export class SdkOrchestrator implements Orchestrator {
     const updated = await prisma.session.update({ where: { id: sessionId }, data });
     const run = this.runs.get(sessionId);
     if (run) {
-      if (effort || language) {
-        // effort/language are baked into the run at start — restart on next message
-        // (resume keeps context) so the new value takes effect.
+      if (effort || language || subagentModel) {
+        // effort/language and the sub-agent model (baked into `agents` at start) can't
+        // change live — restart on next message (resume keeps context) to take effect.
         await run.stop().catch(() => undefined);
         this.runs.delete(sessionId);
       } else if (model) {
