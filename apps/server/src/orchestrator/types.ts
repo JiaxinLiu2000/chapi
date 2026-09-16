@@ -43,6 +43,9 @@ export interface Orchestrator {
 
   /** True if a run is currently active for this session. */
   isActive(sessionId: string): boolean;
+
+  /** The active Claude seat hit its usage limit — switch to the fallback seat and replay the turn. */
+  onRateLimit(sessionId: string, lastUserText: string): Promise<void>;
 }
 
 let active: Orchestrator | null = null;

@@ -60,8 +60,23 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
         enableBrowser: s.enableBrowser,
         browserHidden: s.browserHidden,
         maxBrowserPages: s.maxBrowserPages,
+        claudeEmailPrimary: s.claudeEmailPrimary,
+        claudeEmailFallback: s.claudeEmailFallback,
+        claudeCooldownH: s.claudeCooldownH,
       });
   }, [s]);
+
+  const [claudeMsg, setClaudeMsg] = useState('');
+  const useClaudePrimary = async () => {
+    try {
+      await api.updateSettings(form);
+      await api.useClaudePrimary();
+      await refetch();
+      setClaudeMsg('已切回主账号');
+    } catch (e) {
+      setClaudeMsg(e instanceof Error ? e.message : '切换失败');
+    }
+  };
 
   const set = (k: keyof UpdateSettingsInput, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -141,7 +156,14 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
     try {
       await api.updateSettings(form);
       await refetch();
-      setForm((f) => ({ ...f, openAiKey: '', googleOAuthClientId: '', googleOAuthClientSecret: '' }));
+      setForm((f) => ({
+        ...f,
+        openAiKey: '',
+        googleOAuthClientId: '',
+        googleOAuthClientSecret: '',
+        claudeTokenPrimary: '',
+        claudeTokenFallback: '',
+      }));
       setMsg('已保存');
     } catch (e) {
       setMsg(e instanceof Error ? e.message : '保存失败');
@@ -233,6 +255,74 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
               ))}
             </select>
           </Field>
+        </div>
+
+        <div className="space-y-3 border-t border-border pt-3">
+          <div className="flex items-center gap-2 text-xs font-semibold text-muted">
+            Claude 账号（限额自动切换）
+            <span className="rounded-full bg-panel2 px-2 py-0.5 text-[10px] font-normal text-muted">
+              当前：{s?.claudeActive === 'fallback' ? '备用号' : '主号'}
+            </span>
+          </div>
+          <p className="text-[11px] text-muted/70">
+            用 <code className="rounded bg-panel2 px-1">claude setup-token</code> 在各账号下各生成一个长期 token 填入。
+            主号到限额会自动切到备用号并重试；冷却后新会话再优先试主号。
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="主账号 token" saved={s?.hasClaudeTokenPrimary} hint={s?.claudeEmailPrimary}>
+              <input
+                className={inputCls}
+                type="password"
+                placeholder={s?.hasClaudeTokenPrimary ? '••••••••' : 'sk-ant-oat…'}
+                value={form.claudeTokenPrimary ?? ''}
+                onChange={(e) => set('claudeTokenPrimary', e.target.value)}
+              />
+            </Field>
+            <Field label="备用账号 token" saved={s?.hasClaudeTokenFallback} hint={s?.claudeEmailFallback}>
+              <input
+                className={inputCls}
+                type="password"
+                placeholder={s?.hasClaudeTokenFallback ? '••••••••' : 'sk-ant-oat…'}
+                value={form.claudeTokenFallback ?? ''}
+                onChange={(e) => set('claudeTokenFallback', e.target.value)}
+              />
+            </Field>
+            <Field label="主账号邮箱">
+              <input
+                className={inputCls}
+                type="email"
+                value={form.claudeEmailPrimary ?? ''}
+                onChange={(e) => set('claudeEmailPrimary', e.target.value)}
+              />
+            </Field>
+            <Field label="备用账号邮箱">
+              <input
+                className={inputCls}
+                type="email"
+                value={form.claudeEmailFallback ?? ''}
+                onChange={(e) => set('claudeEmailFallback', e.target.value)}
+              />
+            </Field>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm">
+              <span>切回主号冷却(小时)</span>
+              <input
+                type="number"
+                min={1}
+                max={72}
+                className="w-16 rounded-md border border-border bg-panel2 px-2 py-1 text-xs"
+                value={form.claudeCooldownH ?? 5}
+                onChange={(e) => setForm((f) => ({ ...f, claudeCooldownH: Number(e.target.value) }))}
+              />
+            </label>
+            {s?.claudeActive === 'fallback' && (
+              <Button variant="outline" className="text-xs" onClick={useClaudePrimary}>
+                立即切回主号
+              </Button>
+            )}
+            {claudeMsg && <span className="text-[11px] text-muted">{claudeMsg}</span>}
+          </div>
         </div>
 
         <div className="space-y-2 border-t border-border pt-3">

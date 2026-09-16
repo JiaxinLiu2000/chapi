@@ -15,6 +15,7 @@ export interface BuildOptionsDeps {
   canUseTool: CanUseTool;
   hooks: Partial<Record<HookEvent, HookCallbackMatcher[]>>;
   anthropicKey?: string;
+  oauthToken?: string; // CLAUDE_CODE_OAUTH_TOKEN for the active subscription seat
   mcpServers?: Options['mcpServers'];
   allowedTools?: string[];
   extraSystemContext?: string | null;
@@ -93,6 +94,8 @@ export function buildRunOptions(session: Session, deps: BuildOptionsDeps): Optio
       // "→" arrow, Chinese) doesn't crash on the Windows cp1252 console.
       PYTHONUTF8: '1',
       PYTHONIOENCODING: 'utf-8',
+      // Select the active Claude subscription seat for this run (account failover).
+      ...(deps.oauthToken ? { CLAUDE_CODE_OAUTH_TOKEN: deps.oauthToken } : {}),
       ...(deps.anthropicKey ? { ANTHROPIC_API_KEY: deps.anthropicKey } : {}),
     },
   };

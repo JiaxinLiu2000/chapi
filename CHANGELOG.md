@@ -4,6 +4,17 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.47 — 双 Claude 账号:主号优先,限额自动切备用号
+
+- 支持两个 Claude 订阅账号做故障转移:默认用**主号**,主号到达使用限额(SDK 的 `rate_limit`)时**自动切到备用号**
+  并**重试上一条消息**(resume 保留上下文、不重复写入 transcript),弹通知告知已切换;**冷却**(默认 5 小时、可配)
+  后新会话再优先试主号。
+- 机制:SDK 子进程用 `CLAUDE_CODE_OAUTH_TOKEN` 选择账号。设置里各填一个 token(用 `claude setup-token` 生成)——
+  加密存储、掩码显示、「已保存」徽标。可填主/备邮箱、切回冷却小时数;当前若在备用号,设置里有「立即切回主号」。
+- 覆盖主运行与摘要/复盘(`llm.ts`)。都没配 token 时沿用本机 Claude 登录(旧行为不变)。备用号也到限额时明确提示,不循环。
+- 新增 `engine/accounts.ts`(选号/切换/冷却逻辑)、`POST /settings/claude/use-primary`(手动切回)、Session 无关的
+  账号状态存于 Setting 表(`claude_active`/`claude_primary_limited_at` 等)。
+
 ## v0.1.46 — 任务栏可分别调主代理/子代理模型（子模型真正生效）
 
 - 顶部配置栏把原来的单个「模型」拆成**主代理**和**子代理**两个下拉（各含全部可选模型 Opus 4.8 / Sonnet 4.6 /

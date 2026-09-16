@@ -1,5 +1,6 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { settings } from '../secrets.js';
+import { chooseActiveAccount } from './accounts.js';
 
 /**
  * One-shot LLM completion for summaries & consolidation.
@@ -20,7 +21,13 @@ export async function complete(opts: {
   model?: string;
 }): Promise<string> {
   const key = await settings.getAnthropicKey();
+  const acct = await chooseActiveAccount();
   const model = opts.model ?? (await settings.getModels()).subagent;
+  const authEnv = acct.token
+    ? { ...process.env, CLAUDE_CODE_OAUTH_TOKEN: acct.token }
+    : key
+      ? { ...process.env, ANTHROPIC_API_KEY: key }
+      : process.env;
 
   const q = query({
     prompt: opts.prompt,
@@ -33,7 +40,7 @@ export async function complete(opts: {
       mcpServers: {},
       maxTurns: 1,
       includePartialMessages: false,
-      env: key ? { ...process.env, ANTHROPIC_API_KEY: key } : process.env,
+      env: authEnv,
     },
   });
 

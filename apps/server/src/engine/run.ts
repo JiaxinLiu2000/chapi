@@ -22,6 +22,8 @@ import { buildExternalMcpServers } from './tools/mcpRegistry.js';
 import { latestSummary } from '../learning/summarize.js';
 import { ensureSandboxHelpers } from '../services/workspaces.js';
 import { sessionPaths } from '../config.js';
+import { chooseActiveAccount, type AccountName } from './accounts.js';
+import { getOrchestrator } from '../orchestrator/types.js';
 
 const log = createLogger('engine:run');
 
@@ -49,6 +51,9 @@ export class Run {
   private q: Query | null = null;
   private started = false;
   private loop: Promise<void> | null = null;
+  private account: AccountName = 'machine'; // Claude seat this run is using
+  private lastUserText = ''; // last user turn, replayed on account failover
+  private failingOver = false; // guard: fail over at most once per run
 
   constructor(
     private readonly sessionId: string,
@@ -58,6 +63,7 @@ export class Run {
   }
 
   async pushUserMessage(text: string): Promise<void> {
+    this.lastUserText = text;
     await this.ensureStarted();
     this.input.push(text);
     // New turn starting → reflect "running" immediately (the long-lived query
@@ -101,6 +107,9 @@ export class Run {
     await ensureSandboxHelpers(sessionPaths(session.id).sandbox).catch(() => undefined);
 
     const anthropicKey = await settings.getAnthropicKey();
+    // Pick the active Claude subscription seat (primary, or fallback after a limit).
+    const acct = await chooseActiveAccount();
+    this.account = acct.name;
     const maxSubagents = await settings.getMaxSubagents();
     const canUseTool = buildCanUseTool(
       session.id,
@@ -114,6 +123,7 @@ export class Run {
       canUseTool,
       hooks,
       anthropicKey,
+      oauthToken: acct.token,
       mcpServers: { chapi: chapiServer, ...external },
       // Pre-approve our own tools + safe built-ins so they don't go through the
       // permission path. Writes (Write/Edit/Bash) and any external MCP tools fall
@@ -219,7 +229,16 @@ export class Run {
       message?: unknown;
       parent_tool_use_id?: string | null;
       subagent_type?: string;
+      error?: string;
     };
+
+    // Usage-limit on the active Claude seat → hand off to the orchestrator to fail
+    // over to the fallback seat and replay this turn. Skip persisting the (empty) errored turn.
+    if (m.error === 'rate_limit') {
+      await this.onRateLimit();
+      return;
+    }
+
     // Each assistant message = one Claude Code model response (main agent OR a
     // background sub-agent). Count it live so "Claude 调用" grows as work happens
     // (instead of only at turn end, which reads 0 during/after interrupted turns).
@@ -245,6 +264,25 @@ export class Run {
       },
     });
     bus.emit({ type: 'assistant.message', sessionId: this.sessionId, message: toMessageDTO(row) });
+  }
+
+  /** The active Claude seat hit its usage limit. Fail over (from primary) or report (fallback). */
+  private async onRateLimit(): Promise<void> {
+    if (this.failingOver) return;
+    this.failingOver = true;
+    if (this.account === 'primary') {
+      log.warn(`session ${this.sessionId}: primary Claude account rate-limited — failing over`);
+      void getOrchestrator().onRateLimit(this.sessionId, this.lastUserText);
+    } else {
+      const body =
+        this.account === 'fallback'
+          ? '主账号与备用账号都已达到使用限额，请稍后再试。'
+          : '当前 Claude 账号已达使用限额。';
+      bus.emit({ type: 'notification', sessionId: this.sessionId, level: 'error', title: '已达使用限额', body });
+      bus.emit({ type: 'error', sessionId: this.sessionId, message: body });
+      await this.monitor.finishAll('interrupted').catch(() => undefined);
+      bus.emit({ type: 'run.state', sessionId: this.sessionId, state: 'idle' });
+    }
   }
 
   private handlePartial(msg: SDKMessage): void {

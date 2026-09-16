@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { updateSettingsSchema } from '@chapi/shared';
 import { settings } from '../../secrets.js';
+import { switchToPrimary } from '../../engine/accounts.js';
 import { connectGoogle } from '../../services/googleAuth.js';
 import { supervisor } from '../../supervisor.js';
 
@@ -26,6 +27,12 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     ) {
       void supervisor.restartBrowser();
     }
+    return { settings: await settings.getPublic() };
+  });
+
+  // Manually switch the active Claude seat back to the primary account.
+  app.post('/settings/claude/use-primary', async () => {
+    await switchToPrimary();
     return { settings: await settings.getPublic() };
   });
 

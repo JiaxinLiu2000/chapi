@@ -20,8 +20,23 @@ const KEY_BROWSER_ENABLED = 'browser_enabled';
 const KEY_BROWSER_HIDDEN = 'browser_hidden';
 const KEY_MAX_SUBAGENTS = 'max_subagents';
 const KEY_MAX_BROWSER_PAGES = 'max_browser_pages';
+// Claude account failover (two subscription seats).
+const KEY_CLAUDE_TOKEN_PRIMARY = 'claude_token_primary';
+const KEY_CLAUDE_TOKEN_FALLBACK = 'claude_token_fallback';
+const KEY_CLAUDE_EMAIL_PRIMARY = 'claude_email_primary';
+const KEY_CLAUDE_EMAIL_FALLBACK = 'claude_email_fallback';
+const KEY_CLAUDE_ACTIVE = 'claude_active'; // 'primary' | 'fallback'
+const KEY_CLAUDE_PRIMARY_LIMITED_AT = 'claude_primary_limited_at';
+const KEY_CLAUDE_COOLDOWN_H = 'claude_cooldown_h';
 
-const SECRET_KEYS = new Set([KEY_OPENAI, KEY_ANTHROPIC, KEY_GOOGLE_ID, KEY_GOOGLE_SECRET]);
+const SECRET_KEYS = new Set([
+  KEY_OPENAI,
+  KEY_ANTHROPIC,
+  KEY_GOOGLE_ID,
+  KEY_GOOGLE_SECRET,
+  KEY_CLAUDE_TOKEN_PRIMARY,
+  KEY_CLAUDE_TOKEN_FALLBACK,
+]);
 
 /** Derive a stable 32-byte key from the configured secret (any format). */
 function encryptionKey(): Buffer | null {
@@ -149,6 +164,43 @@ class SettingsStore {
     return Number.isFinite(n) ? Math.min(2, Math.max(1, n)) : config.maxBrowserPages;
   }
 
+  // ── Claude account failover ────────────────────────────────────────────
+  async getClaudeAccounts(): Promise<{
+    primaryToken?: string;
+    fallbackToken?: string;
+    primaryEmail: string;
+    fallbackEmail: string;
+  }> {
+    return {
+      primaryToken: (await this.readRaw(KEY_CLAUDE_TOKEN_PRIMARY)) || undefined,
+      fallbackToken: (await this.readRaw(KEY_CLAUDE_TOKEN_FALLBACK)) || undefined,
+      primaryEmail: (await this.readRaw(KEY_CLAUDE_EMAIL_PRIMARY)) || 'jiaxin.liu@unitpulse.ai',
+      fallbackEmail: (await this.readRaw(KEY_CLAUDE_EMAIL_FALLBACK)) || 'liu.j37@northeastern.edu',
+    };
+  }
+
+  async getClaudeFailover(): Promise<{
+    active: 'primary' | 'fallback';
+    primaryLimitedAt: string;
+    cooldownH: number;
+  }> {
+    const active = (await this.readRaw(KEY_CLAUDE_ACTIVE)) === 'fallback' ? 'fallback' : 'primary';
+    const n = Number.parseInt((await this.readRaw(KEY_CLAUDE_COOLDOWN_H)) || '5', 10);
+    return {
+      active,
+      primaryLimitedAt: (await this.readRaw(KEY_CLAUDE_PRIMARY_LIMITED_AT)) || '',
+      cooldownH: Number.isFinite(n) ? Math.min(72, Math.max(1, n)) : 5,
+    };
+  }
+
+  async setClaudeActive(v: 'primary' | 'fallback'): Promise<void> {
+    await this.write(KEY_CLAUDE_ACTIVE, v);
+  }
+
+  async setClaudePrimaryLimitedAt(iso: string): Promise<void> {
+    await this.write(KEY_CLAUDE_PRIMARY_LIMITED_AT, iso);
+  }
+
   async getPublic(): Promise<PublicSettingsDTO> {
     const models = await this.getModels();
     const google = await this.getGoogleOAuth();
@@ -166,6 +218,13 @@ class SettingsStore {
       browserHidden: await this.getBrowserHidden(),
       maxSubagents: await this.getMaxSubagents(),
       maxBrowserPages: await this.getMaxBrowserPages(),
+      hasClaudeTokenPrimary: Boolean((await this.readRaw(KEY_CLAUDE_TOKEN_PRIMARY)) || ''),
+      hasClaudeTokenFallback: Boolean((await this.readRaw(KEY_CLAUDE_TOKEN_FALLBACK)) || ''),
+      claudeEmailPrimary: (await this.readRaw(KEY_CLAUDE_EMAIL_PRIMARY)) || 'jiaxin.liu@unitpulse.ai',
+      claudeEmailFallback: (await this.readRaw(KEY_CLAUDE_EMAIL_FALLBACK)) || 'liu.j37@northeastern.edu',
+      claudeActive: (await this.getClaudeFailover()).active,
+      claudePrimaryLimitedAt: (await this.readRaw(KEY_CLAUDE_PRIMARY_LIMITED_AT)) || '',
+      claudeCooldownH: (await this.getClaudeFailover()).cooldownH,
     };
   }
 
@@ -198,6 +257,14 @@ class SettingsStore {
       [
         KEY_MAX_BROWSER_PAGES,
         input.maxBrowserPages === undefined ? undefined : String(input.maxBrowserPages),
+      ],
+      [KEY_CLAUDE_TOKEN_PRIMARY, input.claudeTokenPrimary],
+      [KEY_CLAUDE_TOKEN_FALLBACK, input.claudeTokenFallback],
+      [KEY_CLAUDE_EMAIL_PRIMARY, input.claudeEmailPrimary],
+      [KEY_CLAUDE_EMAIL_FALLBACK, input.claudeEmailFallback],
+      [
+        KEY_CLAUDE_COOLDOWN_H,
+        input.claudeCooldownH === undefined ? undefined : String(input.claudeCooldownH),
       ],
     ];
     for (const [key, value] of entries) {

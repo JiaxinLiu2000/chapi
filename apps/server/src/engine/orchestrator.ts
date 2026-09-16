@@ -9,6 +9,7 @@ import { consolidateSession } from '../learning/consolidate.js';
 import { summarizeSession } from '../learning/summarize.js';
 import { hitl } from './hitl.js';
 import { Run, type QueryFn } from './run.js';
+import { switchToFallback } from './accounts.js';
 
 const log = createLogger('engine:orchestrator');
 
@@ -124,6 +125,45 @@ export class SdkOrchestrator implements Orchestrator {
 
   isActive(sessionId: string): boolean {
     return this.runs.has(sessionId);
+  }
+
+  /**
+   * The primary Claude seat hit its usage limit. Switch to the fallback seat and
+   * replay the last turn on a fresh run that RESUMES the same SDK session (context
+   * preserved). We re-push the user text directly — not via handleUserMessage — so
+   * the transcript / roundCount aren't duplicated.
+   */
+  async onRateLimit(sessionId: string, lastUserText: string): Promise<void> {
+    const fallback = await switchToFallback();
+    const old = this.runs.get(sessionId);
+    await old?.stop().catch(() => undefined);
+    this.runs.delete(sessionId);
+
+    if (!fallback) {
+      bus.emit({
+        type: 'notification',
+        sessionId,
+        level: 'error',
+        title: '主账号已达使用限额',
+        body: '未配置可用的备用账号，请在设置里填入备用账号的 token。',
+      });
+      bus.emit({ type: 'run.state', sessionId, state: 'idle' });
+      return;
+    }
+
+    bus.emit({
+      type: 'notification',
+      sessionId,
+      level: 'info',
+      title: '已切换到备用账号',
+      body: `主账号已达使用限额，已切换到备用账号 ${fallback.email} 并自动重试。`,
+    });
+
+    if (lastUserText.trim()) {
+      await this.getRun(sessionId).pushUserMessage(lastUserText);
+    } else {
+      bus.emit({ type: 'run.state', sessionId, state: 'idle' });
+    }
   }
 
   async setConfig(

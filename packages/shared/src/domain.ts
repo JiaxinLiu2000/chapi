@@ -268,4 +268,12 @@ export interface PublicSettingsDTO {
   browserHidden: boolean;
   maxSubagents: number;
   maxBrowserPages: number; // 1 or 2 live browser panes
+  // Claude account failover: primary subscription, auto-switch to fallback on limit.
+  hasClaudeTokenPrimary: boolean;
+  hasClaudeTokenFallback: boolean;
+  claudeEmailPrimary: string;
+  claudeEmailFallback: string;
+  claudeActive: 'primary' | 'fallback'; // which account is currently active
+  claudePrimaryLimitedAt: string; // ISO when primary last hit its limit, or ''
+  claudeCooldownH: number; // hours before retrying primary after a switch
 }
