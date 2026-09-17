@@ -94,6 +94,7 @@ function TagChip({ tag }: { tag: string }) {
 
 function AgentRow({ a, currentStage }: { a: AgentRunDTO; currentStage?: string | null }) {
   const isMain = a.name === 'main';
+  const isQuality = a.name === '质检';
   const running = a.status === 'running';
   const scheduled = a.status === 'scheduled';
   // main agent shows the CURRENT plan stage; others show their task title
@@ -116,8 +117,10 @@ function AgentRow({ a, currentStage }: { a: AgentRunDTO; currentStage?: string |
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
           <Cpu size={13} className={running || scheduled ? 'text-success' : 'text-muted'} />
-          <span>{isMain ? '主代理' : scheduled ? '定时检查' : '子代理'}</span>
-          {!isMain && !scheduled && <span className="truncate text-[10px] text-muted/60">{a.name}</span>}
+          <span>{isMain ? '主代理' : isQuality ? '质检' : scheduled ? '定时检查' : '子代理'}</span>
+          {!isMain && !isQuality && !scheduled && (
+            <span className="truncate text-[10px] text-muted/60">{a.name}</span>
+          )}
         </div>
         <span
           className={cn(

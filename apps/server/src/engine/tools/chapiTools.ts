@@ -42,6 +42,8 @@ export const CHAPI_TOOL_NAMES = [
   'mcp__chapi__pdf_edit',
   'mcp__chapi__set_plan',
   'mcp__chapi__schedule_task',
+  'mcp__chapi__schedule_quality_review',
+  'mcp__chapi__cancel_quality_review',
   'mcp__chapi__get_current_time',
 ];
 
@@ -290,6 +292,28 @@ export function buildChapiToolServer(sessionId: string) {
     },
   );
 
+  const scheduleQualityReview = tool(
+    'schedule_quality_review',
+    '为较长/多阶段任务开启**定时质检代理**:每隔 intervalMinutes 分钟自动评估已产出的阶段性产物(读沙盘文件+任务流+交付物),打分并列出问题;会把有问题的步骤标红、通知用户,并把问题以 `[质检反馈]` 回传给你让你修正。长任务/批量任务建议开启(如每 10 分钟)。同一会话重复调用会重置周期。',
+    {
+      intervalMinutes: z.number().int().min(5).max(120).describe('质检间隔(分钟，5~120)'),
+    },
+    async (args) => {
+      scheduler.scheduleQualityReview(sessionId, args.intervalMinutes * 60_000);
+      return text(`已开启定时质检：每 ${args.intervalMinutes} 分钟评估一次阶段性产物质量。`);
+    },
+  );
+
+  const cancelQualityReview = tool(
+    'cancel_quality_review',
+    '关闭本会话的定时质检代理。',
+    {},
+    async () => {
+      scheduler.cancelQualityReview(sessionId);
+      return text('已关闭定时质检。');
+    },
+  );
+
   const getCurrentTime = tool(
     'get_current_time',
     '获取当前日期与时间（本地 + UTC + 时区 + epoch）。本工作流很看重时间，需要时随时调用以拿到最新时间。',
@@ -316,6 +340,8 @@ export function buildChapiToolServer(sessionId: string) {
       pdfEditTool,
       setPlan,
       scheduleTask,
+      scheduleQualityReview,
+      cancelQualityReview,
       getCurrentTime,
     ],
   });

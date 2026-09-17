@@ -10,6 +10,7 @@ import { summarizeSession } from '../learning/summarize.js';
 import { hitl } from './hitl.js';
 import { Run, type QueryFn } from './run.js';
 import { switchToFallback } from './accounts.js';
+import { scheduler } from './scheduler.js';
 
 const log = createLogger('engine:orchestrator');
 
@@ -104,6 +105,7 @@ export class SdkOrchestrator implements Orchestrator {
   }
 
   async markCompleted(sessionId: string): Promise<void> {
+    scheduler.cancelQualityReview(sessionId);
     await this.runs.get(sessionId)?.stop().catch(() => undefined);
     this.runs.delete(sessionId);
     bus.emit({
@@ -119,6 +121,7 @@ export class SdkOrchestrator implements Orchestrator {
   }
 
   async abandon(sessionId: string): Promise<void> {
+    scheduler.cancelQualityReview(sessionId);
     await this.runs.get(sessionId)?.stop().catch(() => undefined);
     this.runs.delete(sessionId);
   }

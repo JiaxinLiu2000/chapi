@@ -4,6 +4,7 @@ import { createLogger } from '../logger.js';
 import { toAgentRunDTO } from '../mappers.js';
 import { getOrchestrator } from '../orchestrator/types.js';
 import { emitAttention } from './attention.js';
+import { runQualityReview } from './quality.js';
 
 const log = createLogger('scheduler');
 
@@ -14,6 +15,40 @@ const log = createLogger('scheduler');
  */
 class Scheduler {
   private timers = new Map<string, NodeJS.Timeout>();
+  private qualityTimers = new Map<string, NodeJS.Timeout>();
+
+  /** Periodic quality review of a session's stage deliverables (recurring). */
+  scheduleQualityReview(sessionId: string, intervalMs: number): void {
+    this.cancelQualityReview(sessionId);
+    const arm = (): void => {
+      const t = setTimeout(async () => {
+        const s = await prisma.session.findUnique({ where: { id: sessionId } }).catch(() => null);
+        if (!s || s.status !== 'active') {
+          this.cancelQualityReview(sessionId);
+          return;
+        }
+        try {
+          await runQualityReview(sessionId);
+        } catch (err) {
+          log.warn('quality review error', err);
+        }
+        if (this.qualityTimers.has(sessionId)) arm(); // re-arm unless cancelled meanwhile
+      }, intervalMs);
+      this.qualityTimers.set(sessionId, t);
+    };
+    arm();
+    log.info(`quality review scheduled for session ${sessionId} every ${Math.round(intervalMs / 60000)}min`);
+  }
+
+  cancelQualityReview(sessionId: string): void {
+    const t = this.qualityTimers.get(sessionId);
+    if (t) clearTimeout(t);
+    this.qualityTimers.delete(sessionId);
+  }
+
+  isQualityReviewOn(sessionId: string): boolean {
+    return this.qualityTimers.has(sessionId);
+  }
 
   async schedule(sessionId: string, delaySeconds: number, description: string): Promise<Date> {
     const scheduledFor = new Date(Date.now() + delaySeconds * 1000);

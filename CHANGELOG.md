@@ -4,6 +4,16 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.48 — 定时质检代理:按时评估阶段性产物质量
+
+- 新增**定时质检代理**:长/多阶段任务可开启,周期性(默认 10 分钟,可配 5~120)评估已产出的阶段性产物。
+  只读地读取沙盘文件 + 任务流 + 已登记交付物,按 rubric(是否满足目标/完整性、数据可核验/异常、格式、遗漏)
+  给出**结构化评分 + 问题清单 + 修改建议**。
+- 发现问题后:把相关任务流步骤标 **problem**、**弹通知**给用户、并把问题以 **`[质检反馈]` 回传主代理**让它自动修正。
+- 监控里显示一个 **「质检」代理**,结束后带评分/总结。用完/归档会自动关闭(markCompleted/abandon)。
+- 工具:`schedule_quality_review({intervalMinutes})`、`cancel_quality_review`;系统提示指导主代理在长任务时开启并响应 `[质检反馈]`。
+- 质检代理走当前活跃账号(尊重主/备切换),用子代理模型,失败则跳过本轮不影响主任务。
+
 ## v0.1.47 — 双 Claude 账号:主号优先,限额自动切备用号
 
 - 支持两个 Claude 订阅账号做故障转移:默认用**主号**,主号到达使用限额(SDK 的 `rate_limit`)时**自动切到备用号**
