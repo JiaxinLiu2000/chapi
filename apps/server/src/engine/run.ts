@@ -177,6 +177,18 @@ export class Run {
       // Tolerate a session deleted mid-run (writes would FK-fail).
       await this.monitor.finishAll('done').catch(() => undefined);
       bus.emit({ type: 'run.state', sessionId: this.sessionId, state: 'idle' });
+
+      // The query loop is meant to stay open across turns for the life of the Run.
+      // If it ended on its own here (not via our own stop()/abort — e.g. the active
+      // Claude seat hit a fatal rate limit and its subprocess exited), this Run
+      // object otherwise stays registered as "started" forever, so any later
+      // pushUserMessage() (like the user replying "继续") would just buffer into a
+      // now-dead input queue with no visible effect. Reset so the next message
+      // starts a fresh query (still `resume`-ing the same SDK session).
+      if (!this.abort.signal.aborted) {
+        this.started = false;
+        this.q = null;
+      }
     }
   }
 

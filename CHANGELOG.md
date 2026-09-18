@@ -4,6 +4,16 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.53 — 修复：双账号都限额后，运行卡死、回复无反应
+
+- 根因:两个 Claude 账号(主/备)在同一会话里都被打到使用限额后,`Run` 只是把主代理/子代理/质检标成空闲、
+  弹一条提示,但**没有重置自身运行状态**——底层 query 循环已经自然结束,但 `Run` 仍标记为"已启动",导致
+  之后用户发的任何消息(包括"继续")都被塞进一个已经没人读取的队列里,界面毫无反应。
+- 修复:query 循环非主动 `stop()`/中断而结束时(如账号被限额导致底层子进程退出),重置内部状态,
+  让下一条用户消息真正重新起一个 query(仍 `resume` 接上下文,不丢历史)。
+- 不改变已知外部限制:如果两个账号当时都还在限额中,新起的 query 依然会立刻收到 rate_limit,
+  但这次会正常弹出提示,而不是静默卡死。
+
 ## v0.1.52 — 自动质检频率可在下拉框调
 
 - 选择器里新增**「质检」下拉**(关闭 / 每 5 / 10 / 15 / 30 / 60 分钟),主页新建对话与会话顶栏都有。
