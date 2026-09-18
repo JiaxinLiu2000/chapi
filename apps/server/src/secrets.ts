@@ -31,7 +31,12 @@ const KEY_CLAUDE_COOLDOWN_H = 'claude_cooldown_h';
 const KEY_CLAUDE_MODELS_PRIMARY = 'claude_models_primary'; // comma-separated model IDs
 const KEY_CLAUDE_MODELS_FALLBACK = 'claude_models_fallback';
 
-const ALL_MODEL_IDS = ['claude-opus-4-8', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'];
+const ALL_MODEL_IDS = [
+  'claude-fable-5',
+  'claude-opus-4-8',
+  'claude-sonnet-4-6',
+  'claude-haiku-4-5-20251001',
+];
 
 const SECRET_KEYS = new Set([
   KEY_OPENAI,

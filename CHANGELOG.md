@@ -4,6 +4,12 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.50 — 加入 Claude Fable 5 模型选项
+
+- 模型下拉新增 **Fable 5 · 最强**(`claude-fable-5`)。实测主账号 jiaxin.liu@unitpulse.ai 可用。
+  同步进入设置的「主/备账号可用模型」勾选项;默认可用模型集合含 Fable(可按各账号真实权限取消勾选)。
+- Opus 4.8 标签由「最强」改为「强」(Fable 现为最强)。
+
 ## v0.1.49 — 顶栏「账号」下拉:每会话选账号 + 模型随账号权限过滤
 
 - 顶栏配置栏新增**「账号」下拉**(仅在配置了 Claude token 时显示):**自动(主→备)**[默认] / **主号** / **备号**。

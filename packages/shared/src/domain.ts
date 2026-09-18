@@ -65,7 +65,8 @@ export type EffortLevel = (typeof EFFORT_LEVELS)[number];
 
 /** Selectable Claude models shown in the UI. */
 export const MODEL_OPTIONS = [
-  { id: 'claude-opus-4-8', label: 'Opus 4.8 · 最强' },
+  { id: 'claude-fable-5', label: 'Fable 5 · 最强' },
+  { id: 'claude-opus-4-8', label: 'Opus 4.8 · 强' },
   { id: 'claude-sonnet-4-6', label: 'Sonnet 4.6 · 均衡' },
   { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5 · 最快' },
 ] as const;
