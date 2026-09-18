@@ -65,8 +65,23 @@ export async function chooseActiveAccount(mode: 'auto' | 'primary' | 'fallback' 
     : { name: 'fallback', token: acc.fallbackToken, email: acc.fallbackEmail };
 }
 
-/** Record that a seat just hit its usage limit — starts that seat's own cooldown clock. */
+/**
+ * Record that a seat just hit its usage limit — starts that seat's own cooldown
+ * clock. If a cooldown from an earlier hit on this same seat is still running,
+ * this is the same incident (e.g. a retry that predictably failed again while
+ * still inside the window) — don't restamp it, or the estimated recovery time
+ * would keep sliding forward on every retry and might never actually arrive.
+ */
 export async function recordAccountLimited(account: 'primary' | 'fallback'): Promise<void> {
+  const fo = await settings.getClaudeFailover();
+  const prevIso = account === 'primary' ? fo.primaryLimitedAt : fo.fallbackLimitedAt;
+  if (prevIso) {
+    const prevMs = Date.parse(prevIso);
+    if (Number.isFinite(prevMs) && Date.now() - prevMs < fo.cooldownH * 3600_000) {
+      log.warn(`Claude ${account} account rate-limited again (still within its existing cooldown — clock unchanged)`);
+      return;
+    }
+  }
   const iso = new Date().toISOString();
   if (account === 'primary') await settings.setClaudePrimaryLimitedAt(iso);
   else await settings.setClaudeFallbackLimitedAt(iso);
