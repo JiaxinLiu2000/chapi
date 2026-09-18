@@ -4,7 +4,7 @@ import { sessionPaths } from '../config.js';
 import { prisma } from '../db/client.js';
 import { bus } from '../gateway/bus.js';
 import { createLogger } from '../logger.js';
-import { toAgentRunDTO, toPlanTaskDTO } from '../mappers.js';
+import { toAgentRunDTO, toMessageDTO, toPlanTaskDTO } from '../mappers.js';
 import { settings } from '../secrets.js';
 import { getOrchestrator } from '../orchestrator/types.js';
 import { chooseActiveAccount } from './accounts.js';
@@ -147,6 +147,30 @@ export async function runQualityReview(sessionId: string): Promise<void> {
   });
   bus.emit({ type: 'agent.status', sessionId, agent: toAgentRunDTO(agentRun) });
   if (!verdict) return;
+
+  // Post the verdict into the conversation itself (not just a toast) so it stays
+  // visible in the transcript, styled distinctly (yellow) from the main agent.
+  const issueLines = verdict.issues
+    .map((i) => `- [${i.severity}] ${i.where}：${i.problem}（建议：${i.fix}）`)
+    .join('\n');
+  const qualityText = [
+    `质检评分：${verdict.score}/100`,
+    verdict.summary,
+    issueLines ? `发现问题：\n${issueLines}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+  const qualityMessage = await prisma.message.create({
+    data: {
+      sessionId,
+      role: 'assistant',
+      type: 'quality',
+      content: [{ type: 'text', text: qualityText }] as unknown as object,
+      text: qualityText,
+      agentRunId: agentRun.id,
+    },
+  });
+  bus.emit({ type: 'assistant.message', sessionId, message: toMessageDTO(qualityMessage) });
 
   // Mark flagged plan steps as problem.
   if (verdict.planProblems.length) {

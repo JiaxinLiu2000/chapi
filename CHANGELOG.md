@@ -4,6 +4,12 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.55 — 质检结果进对话列表，黄色框区分主代理
+
+- 之前质检的评分/问题只出现在通知弹窗和 agent 监控条里，看完就没了。现在质检每次评估完都会作为一条
+  消息**写进对话列表**（评分 + 概述 + 问题清单，含改进建议），刷新页面也还在。
+- 用颜色区分角色：**质检是醒目的黄色框**（带「🔍 质检」标签），主代理保持原来的样子不变。
+
 ## v0.1.54 — 修复：限额自动切备用账号后，模型无权限导致直接停止
 
 - 根因:备用账号未必拥有主账号的所有模型权限(例如没有 Fable 5)。之前限额自动切备用账号时只切了账号，

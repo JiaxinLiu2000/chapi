@@ -4,16 +4,34 @@ import type { MessageDTO } from '@chapi/shared';
 import { cn } from '@/lib/utils';
 import { Markdown } from './Markdown';
 
-function Bubble({ role, text, streaming }: { role: string; text: string; streaming?: boolean }) {
+function Bubble({
+  role,
+  type,
+  text,
+  streaming,
+}: {
+  role: string;
+  type?: string;
+  text: string;
+  streaming?: boolean;
+}) {
   const isUser = role === 'user';
+  const isQuality = type === 'quality';
   return (
     <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
       <div
         className={cn(
           'max-w-[85%] rounded-2xl px-4 py-2.5',
-          isUser ? 'border border-accent/30 bg-accent/15' : 'border border-border bg-panel',
+          isUser
+            ? 'border border-accent/30 bg-accent/15'
+            : isQuality
+              ? 'border border-warn/50 bg-warn/10'
+              : 'border border-border bg-panel',
         )}
       >
+        {isQuality && (
+          <div className="mb-1 text-xs font-medium text-warn">🔍 质检</div>
+        )}
         {isUser ? (
           <div className="whitespace-pre-wrap text-[15px]">{text}</div>
         ) : (
@@ -46,7 +64,7 @@ export function MessageList({
       {messages
         .filter((m) => m.text.trim().length > 0)
         .map((m) => (
-          <Bubble key={m.id} role={m.role} text={m.text} />
+          <Bubble key={m.id} role={m.role} type={m.type} text={m.text} />
         ))}
       {streaming && <Bubble role="assistant" text={streaming} streaming />}
       {running && !streaming && (
