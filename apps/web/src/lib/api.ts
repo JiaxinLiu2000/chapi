@@ -37,10 +37,10 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   listSessions: () => req<ListSessionsResponse>('/sessions'),
 
-  createSession: (firstMessage?: string) =>
+  createSession: (firstMessage?: string, config?: Record<string, unknown>) =>
     req<CreateSessionResponse>('/sessions', {
       method: 'POST',
-      body: JSON.stringify({ firstMessage }),
+      body: JSON.stringify({ firstMessage, ...(config ?? {}) }),
     }),
 
   sessionDetail: (id: string) => req<SessionDetailResponse>(`/sessions/${id}`),

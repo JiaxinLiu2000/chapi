@@ -24,6 +24,11 @@ export const createSessionSchema = z.object({
   title: z.string().optional(),
   permissionProfile: z.enum(['web', 'vscode']).optional(),
   model: z.string().optional(),
+  // Initial per-session config chosen on the home page (falls back to defaults).
+  subagentModel: z.string().optional(),
+  effort: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional(),
+  language: z.enum(['zh', 'en']).optional(),
+  accountMode: z.enum(['auto', 'primary', 'fallback']).optional(),
 });
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;
 

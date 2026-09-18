@@ -4,6 +4,13 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.51 — 主页新建对话处也能选账号/模型/强度/语言
+
+- 主页(新建对话)在输入框下方新增一整排选择器:**账号 / 主代理 / 子代理 / 思考强度 / 语言**——开新会话前就能选好,
+  作为新会话的初始配置传给创建接口(`createSession` 增 `subagentModel/effort/language/accountMode`)。
+- 抽出共享组件 `ConfigSelectors`,主页与会话顶栏共用同一套渲染与「模型随账号可用范围过滤」逻辑,行为一致。
+- 主页模型默认取设置里的主/子模型;effort 默认最高;账号默认自动。
+
 ## v0.1.50 — 加入 Claude Fable 5 模型选项
 
 - 模型下拉新增 **Fable 5 · 最强**(`claude-fable-5`)。实测主账号 jiaxin.liu@unitpulse.ai 可用。

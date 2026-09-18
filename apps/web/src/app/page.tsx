@@ -1,9 +1,11 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { ArrowUp, Paperclip, Sparkles } from 'lucide-react';
 import { api } from '@/lib/api';
 import { AttachmentTray } from '@/components/AttachmentTray';
+import { ConfigSelectors, type RunConfig } from '@/components/ConfigSelectors';
 import { useAttachmentDraft } from '@/hooks/useAttachmentDraft';
 import { useStore } from '@/lib/store';
 import { cn, withAttachmentNote } from '@/lib/utils';
@@ -20,6 +22,20 @@ export default function HomePage() {
   const [busy, setBusy] = useState(false);
   const draft = useAttachmentDraft();
 
+  const { data: settingsData } = useQuery({ queryKey: ['settings'], queryFn: api.getSettings });
+  const st = settingsData?.settings;
+  const [cfg, setCfg] = useState<RunConfig>({
+    model: '',
+    subagentModel: '',
+    effort: 'max',
+    language: 'zh',
+    accountMode: 'auto',
+  });
+  // Seed the model dropdowns from the configured defaults once settings load.
+  useEffect(() => {
+    if (st) setCfg((c) => (c.model ? c : { ...c, model: st.mainModel, subagentModel: st.subagentModel }));
+  }, [st]);
+
   const start = async (msg: string) => {
     const trimmed = msg.trim();
     if (busy || (!trimmed && draft.items.length === 0)) return;
@@ -31,7 +47,13 @@ export default function HomePage() {
       if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission().catch(() => undefined);
       }
-      const { session } = await api.createSession(seed);
+      const { session } = await api.createSession(seed, {
+        model: cfg.model || undefined,
+        subagentModel: cfg.subagentModel || undefined,
+        effort: cfg.effort,
+        language: cfg.language,
+        accountMode: cfg.accountMode,
+      });
 
       let uploaded;
       try {
@@ -131,6 +153,15 @@ export default function HomePage() {
             </button>
           </div>
         </div>
+      </div>
+
+      <div className="mt-3 flex w-full flex-wrap items-center justify-center gap-2">
+        <ConfigSelectors
+          value={cfg}
+          settings={st}
+          disabled={busy}
+          onChange={(partial) => setCfg((c) => ({ ...c, ...partial }))}
+        />
       </div>
 
       <div className="mt-6 flex w-full flex-col gap-2">

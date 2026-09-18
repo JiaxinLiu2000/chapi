@@ -71,9 +71,13 @@ export async function createSession(input: CreateSessionInput): Promise<SessionD
       slug,
       title,
       model: input.model ?? models.main,
-      subagentModel: models.subagent,
+      subagentModel: input.subagentModel ?? models.subagent,
       permissionProfile: profile,
       status: 'active',
+      // Initial config from the home page; omit → Prisma column defaults apply.
+      ...(input.effort ? { effort: input.effort } : {}),
+      ...(input.language ? { language: input.language } : {}),
+      ...(input.accountMode ? { accountMode: input.accountMode } : {}),
     },
   });
 
