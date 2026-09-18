@@ -4,6 +4,15 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.56 — 两个账号都限额时，按谁先恢复来切换
+
+- 之前只记录"主账号"的限额时间；备用账号自己被打限额时不记录，也不再自动切换，只会报错终止。
+- 现在两个账号各自独立记录被限额的时间点（`claude_primary_limited_at` / `claude_fallback_limited_at`）：
+  主账号限额 → 记录时间、切备用账号；备用账号也限额 → 同样记录时间；`auto` 模式下会对比两边的
+  "冷却结束时间"（限额时间 + 冷却小时数），哪个更快恢复就优先切到哪个账号。
+- 如果两边当前都还没恢复，不会盲目重试（避免死循环报错），只提示"预计 XX 账号先恢复"，
+  等真正恢复后下一条消息会自动用上正确的账号。
+
 ## v0.1.55 — 质检结果进对话列表，黄色框区分主代理
 
 - 之前质检的评分/问题只出现在通知弹窗和 agent 监控条里，看完就没了。现在质检每次评估完都会作为一条

@@ -280,21 +280,22 @@ export class Run {
     bus.emit({ type: 'assistant.message', sessionId: this.sessionId, message: toMessageDTO(row) });
   }
 
-  /** The active Claude seat hit its usage limit. Fail over (from primary) or report (fallback). */
+  /** The active Claude seat hit its usage limit. Fail over (whichever seat, in auto mode) or report. */
   private async onRateLimit(): Promise<void> {
     if (this.failingOver) return;
     this.failingOver = true;
-    // Only auto-switch in 'auto' mode from the primary seat; a manually-pinned seat is not switched.
-    if (this.account === 'primary' && this.accountMode === 'auto') {
-      log.warn(`session ${this.sessionId}: primary Claude account rate-limited — failing over`);
-      void getOrchestrator().onRateLimit(this.sessionId, this.lastUserText);
+    const account = this.account;
+    // Auto mode: escalate regardless of which seat this was — the orchestrator
+    // records this seat's own limit and picks the next usable one (soonest to
+    // recover if both are limited). A manually-pinned seat is not auto-switched.
+    if (this.accountMode === 'auto' && account !== 'machine') {
+      log.warn(`session ${this.sessionId}: ${account} Claude account rate-limited`);
+      void getOrchestrator().onRateLimit(this.sessionId, this.lastUserText, account);
     } else {
       const body =
         this.accountMode !== 'auto'
           ? '当前手动锁定的账号已达使用限额(未自动切换)。可在顶栏改为「自动」或切到另一个账号。'
-          : this.account === 'fallback'
-            ? '主账号与备用账号都已达到使用限额，请稍后再试。'
-            : '当前 Claude 账号已达使用限额。';
+          : '当前 Claude 账号已达使用限额。';
       bus.emit({ type: 'notification', sessionId: this.sessionId, level: 'error', title: '已达使用限额', body });
       bus.emit({ type: 'error', sessionId: this.sessionId, message: body });
       await this.monitor.finishAll('interrupted').catch(() => undefined);

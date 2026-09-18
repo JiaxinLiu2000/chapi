@@ -10,7 +10,7 @@ import { summarizeSession } from '../learning/summarize.js';
 import { settings } from '../secrets.js';
 import { hitl } from './hitl.js';
 import { Run, type QueryFn } from './run.js';
-import { switchToFallback } from './accounts.js';
+import { chooseActiveAccount, recordAccountLimited } from './accounts.js';
 import { scheduler } from './scheduler.js';
 
 const log = createLogger('engine:orchestrator');
@@ -139,37 +139,72 @@ export class SdkOrchestrator implements Orchestrator {
   }
 
   /**
-   * The primary Claude seat hit its usage limit. Switch to the fallback seat and
-   * replay the last turn on a fresh run that RESUMES the same SDK session (context
-   * preserved). We re-push the user text directly — not via handleUserMessage — so
-   * the transcript / roundCount aren't duplicated.
+   * The given Claude seat hit its usage limit. Record it (starts that seat's own
+   * cooldown clock — the two seats are tracked independently), then let account
+   * selection decide the next seat: whichever is ready, or — if both are
+   * currently limited — whichever cools down first. Replays the last turn on a
+   * fresh run that RESUMES the same SDK session (context preserved); we re-push
+   * the user text directly — not via handleUserMessage — so the transcript /
+   * roundCount aren't duplicated.
    */
-  async onRateLimit(sessionId: string, lastUserText: string): Promise<void> {
-    const fallback = await switchToFallback();
+  async onRateLimit(
+    sessionId: string,
+    lastUserText: string,
+    account: 'primary' | 'fallback',
+  ): Promise<void> {
+    await recordAccountLimited(account);
     const old = this.runs.get(sessionId);
     await old?.stop().catch(() => undefined);
     this.runs.delete(sessionId);
 
-    if (!fallback) {
+    const accounts = await settings.getClaudeAccounts();
+    const otherToken = account === 'primary' ? accounts.fallbackToken : accounts.primaryToken;
+    if (!otherToken) {
       bus.emit({
         type: 'notification',
         sessionId,
         level: 'error',
-        title: '主账号已达使用限额',
-        body: '未配置可用的备用账号，请在设置里填入备用账号的 token。',
+        title: account === 'primary' ? '主账号已达使用限额' : '备用账号已达使用限额',
+        body: '未配置可用的另一个账号，请在设置里填入 token。',
       });
       bus.emit({ type: 'run.state', sessionId, state: 'idle' });
       return;
     }
 
-    // The fallback seat may not have access to every model the primary seat does
-    // (e.g. no Fable 5). Downgrade any model the session was using that the
-    // fallback can't run — otherwise the run would immediately die with "There's
-    // an issue with the selected model" right after failing over.
+    const target = await chooseActiveAccount('auto');
+    const fo = await settings.getClaudeFailover();
+    // chooseActiveAccount clears a seat's limited marker once it's actually ready —
+    // if the seat it landed on still has one set, both seats are currently limited
+    // and this was just the soonest-to-recover pick, not a real fix yet.
+    const stillLimited =
+      (target.name === 'primary' && Boolean(fo.primaryLimitedAt)) ||
+      (target.name === 'fallback' && Boolean(fo.fallbackLimitedAt));
+    const toLabel = target.name === 'primary' ? '主账号' : '备用账号';
+
+    if (stillLimited) {
+      // Don't retry immediately — both seats are exhausted right now, so a fresh
+      // run would just fail the same way again. The preference we just recorded
+      // (whichever recovers first) takes effect on the next message, once it's
+      // actually ready.
+      bus.emit({
+        type: 'notification',
+        sessionId,
+        level: 'error',
+        title: '两个账号均已达使用限额',
+        body: `主账号与备用账号都已达使用限额，预计 ${toLabel}（${target.email}）先恢复，届时会优先使用。请稍后再试。`,
+      });
+      bus.emit({ type: 'run.state', sessionId, state: 'idle' });
+      return;
+    }
+
+    // The seat we land on may not have access to every model the previous one
+    // did (e.g. no Fable 5). Downgrade any model the session was using that the
+    // new seat can't run — otherwise the run would immediately die with
+    // "There's an issue with the selected model" right after switching.
     const session = await prisma.session.findUnique({ where: { id: sessionId } });
     const downgrades: string[] = [];
     if (session) {
-      const allowed = (await settings.getClaudeModels()).fallback;
+      const allowed = (await settings.getClaudeModels())[target.name as 'primary' | 'fallback'];
       const data: { model?: string; subagentModel?: string } = {};
       if (allowed.length && !allowed.includes(session.model)) {
         data.model = topAllowedModel(allowed);
@@ -193,13 +228,14 @@ export class SdkOrchestrator implements Orchestrator {
       }
     }
 
+    const fromLabel = account === 'primary' ? '主' : '备用';
     bus.emit({
       type: 'notification',
       sessionId,
       level: 'info',
-      title: '已切换到备用账号',
-      body: `主账号已达使用限额，已切换到备用账号 ${fallback.email} 并自动重试。${
-        downgrades.length ? `备用账号无权限使用原模型，已自动降级：${downgrades.join('；')}。` : ''
+      title: '已切换账号',
+      body: `${fromLabel}账号已达使用限额，已切换到 ${toLabel}（${target.email}）并自动重试。${
+        downgrades.length ? `该账号无权限使用原模型，已自动降级：${downgrades.join('；')}。` : ''
       }`,
     });
 

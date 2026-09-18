@@ -27,6 +27,7 @@ const KEY_CLAUDE_EMAIL_PRIMARY = 'claude_email_primary';
 const KEY_CLAUDE_EMAIL_FALLBACK = 'claude_email_fallback';
 const KEY_CLAUDE_ACTIVE = 'claude_active'; // 'primary' | 'fallback'
 const KEY_CLAUDE_PRIMARY_LIMITED_AT = 'claude_primary_limited_at';
+const KEY_CLAUDE_FALLBACK_LIMITED_AT = 'claude_fallback_limited_at';
 const KEY_CLAUDE_COOLDOWN_H = 'claude_cooldown_h';
 const KEY_CLAUDE_MODELS_PRIMARY = 'claude_models_primary'; // comma-separated model IDs
 const KEY_CLAUDE_MODELS_FALLBACK = 'claude_models_fallback';
@@ -191,6 +192,7 @@ class SettingsStore {
   async getClaudeFailover(): Promise<{
     active: 'primary' | 'fallback';
     primaryLimitedAt: string;
+    fallbackLimitedAt: string;
     cooldownH: number;
   }> {
     const active = (await this.readRaw(KEY_CLAUDE_ACTIVE)) === 'fallback' ? 'fallback' : 'primary';
@@ -198,6 +200,7 @@ class SettingsStore {
     return {
       active,
       primaryLimitedAt: (await this.readRaw(KEY_CLAUDE_PRIMARY_LIMITED_AT)) || '',
+      fallbackLimitedAt: (await this.readRaw(KEY_CLAUDE_FALLBACK_LIMITED_AT)) || '',
       cooldownH: Number.isFinite(n) ? Math.min(72, Math.max(1, n)) : 5,
     };
   }
@@ -208,6 +211,10 @@ class SettingsStore {
 
   async setClaudePrimaryLimitedAt(iso: string): Promise<void> {
     await this.write(KEY_CLAUDE_PRIMARY_LIMITED_AT, iso);
+  }
+
+  async setClaudeFallbackLimitedAt(iso: string): Promise<void> {
+    await this.write(KEY_CLAUDE_FALLBACK_LIMITED_AT, iso);
   }
 
   private async modelsFor(key: string): Promise<string[]> {
