@@ -66,6 +66,8 @@ export const updateSettingsSchema = z.object({
   claudeEmailPrimary: z.string().optional(),
   claudeEmailFallback: z.string().optional(),
   claudeCooldownH: z.number().int().min(1).max(72).optional(),
+  claudeModelsPrimary: z.array(z.string()).optional(),
+  claudeModelsFallback: z.array(z.string()).optional(),
 });
 export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>;
 

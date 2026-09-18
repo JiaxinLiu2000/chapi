@@ -4,6 +4,16 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.49 — 顶栏「账号」下拉:每会话选账号 + 模型随账号权限过滤
+
+- 顶栏配置栏新增**「账号」下拉**(仅在配置了 Claude token 时显示):**自动(主→备)**[默认] / **主号** / **备号**。
+  默认沿用主号优先、限额自动切备用的规律;选具体账号则**手动锁定**该会话不自动切(锁定号到限额只提示、不切)。
+  **每个会话单独**(存 `Session.accountMode`),切换在下一条消息生效(重启 run、resume 保留上下文)。
+- **模型随账号权限过滤**:设置里可为**主账号/备账号各勾选可用模型**;顶栏「主代理/子代理」下拉按所选账号的可用
+  模型过滤;切账号时若当前模型不在新账号可用范围,自动切到该账号第一个可用模型。
+- 机制:`chooseActiveAccount(mode)` 按会话模式选 seat;`set.config` 增 `accountMode`;`PublicSettings` 增
+  `claudeModelsPrimary/Fallback`;新增 `Session.accountMode` 列(已 db push)。
+
 ## v0.1.48 — 定时质检代理:按时评估阶段性产物质量
 
 - 新增**定时质检代理**:长/多阶段任务可开启,周期性(默认 10 分钟,可配 5~120)评估已产出的阶段性产物。

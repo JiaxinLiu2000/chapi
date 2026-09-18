@@ -52,6 +52,7 @@ export class Run {
   private started = false;
   private loop: Promise<void> | null = null;
   private account: AccountName = 'machine'; // Claude seat this run is using
+  private accountMode: 'auto' | 'primary' | 'fallback' = 'auto'; // session's seat selection
   private lastUserText = ''; // last user turn, replayed on account failover
   private failingOver = false; // guard: fail over at most once per run
 
@@ -107,8 +108,9 @@ export class Run {
     await ensureSandboxHelpers(sessionPaths(session.id).sandbox).catch(() => undefined);
 
     const anthropicKey = await settings.getAnthropicKey();
-    // Pick the active Claude subscription seat (primary, or fallback after a limit).
-    const acct = await chooseActiveAccount();
+    // Pick the active Claude subscription seat, honoring the session's account mode.
+    this.accountMode = (session.accountMode as 'auto' | 'primary' | 'fallback') ?? 'auto';
+    const acct = await chooseActiveAccount(this.accountMode);
     this.account = acct.name;
     const maxSubagents = await settings.getMaxSubagents();
     const canUseTool = buildCanUseTool(
@@ -270,14 +272,17 @@ export class Run {
   private async onRateLimit(): Promise<void> {
     if (this.failingOver) return;
     this.failingOver = true;
-    if (this.account === 'primary') {
+    // Only auto-switch in 'auto' mode from the primary seat; a manually-pinned seat is not switched.
+    if (this.account === 'primary' && this.accountMode === 'auto') {
       log.warn(`session ${this.sessionId}: primary Claude account rate-limited — failing over`);
       void getOrchestrator().onRateLimit(this.sessionId, this.lastUserText);
     } else {
       const body =
-        this.account === 'fallback'
-          ? '主账号与备用账号都已达到使用限额，请稍后再试。'
-          : '当前 Claude 账号已达使用限额。';
+        this.accountMode !== 'auto'
+          ? '当前手动锁定的账号已达使用限额(未自动切换)。可在顶栏改为「自动」或切到另一个账号。'
+          : this.account === 'fallback'
+            ? '主账号与备用账号都已达到使用限额，请稍后再试。'
+            : '当前 Claude 账号已达使用限额。';
       bus.emit({ type: 'notification', sessionId: this.sessionId, level: 'error', title: '已达使用限额', body });
       bus.emit({ type: 'error', sessionId: this.sessionId, message: body });
       await this.monitor.finishAll('interrupted').catch(() => undefined);

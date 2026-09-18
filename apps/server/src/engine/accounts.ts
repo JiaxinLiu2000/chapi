@@ -14,12 +14,25 @@ export interface ActiveAccount {
  * Pick which Claude subscription seat a run should use.
  *
  * - No tokens configured → 'machine' (inherit the box's own Claude login, legacy behavior).
- * - Normally the primary seat. After a limit-triggered switch we stay on the fallback until
- *   the cooldown elapses, then optimistically try the primary again on the next run.
+ * - `mode` 'primary'/'fallback' pins that seat (manual override, no auto-switch).
+ * - `mode` 'auto' (default): primary seat, then stay on fallback after a limit until the
+ *   cooldown elapses, then optimistically retry the primary on the next run.
  */
-export async function chooseActiveAccount(): Promise<ActiveAccount> {
+export async function chooseActiveAccount(mode: 'auto' | 'primary' | 'fallback' = 'auto'): Promise<ActiveAccount> {
   const acc = await settings.getClaudeAccounts();
   if (!acc.primaryToken && !acc.fallbackToken) return { name: 'machine' };
+
+  // Manual pin: use the chosen seat directly (fall back to the other if that token is missing).
+  if (mode === 'primary') {
+    return acc.primaryToken
+      ? { name: 'primary', token: acc.primaryToken, email: acc.primaryEmail }
+      : { name: 'fallback', token: acc.fallbackToken, email: acc.fallbackEmail };
+  }
+  if (mode === 'fallback') {
+    return acc.fallbackToken
+      ? { name: 'fallback', token: acc.fallbackToken, email: acc.fallbackEmail }
+      : { name: 'primary', token: acc.primaryToken, email: acc.primaryEmail };
+  }
 
   const fo = await settings.getClaudeFailover();
   if (fo.active === 'fallback' && acc.fallbackToken) {

@@ -34,6 +34,9 @@ export const PLAN_TASK_STATUSES = [
 export type PlanTaskStatus = (typeof PLAN_TASK_STATUSES)[number];
 
 /** UI language for talking to the user (outputs/research still default to English). */
+export const ACCOUNT_MODES = ['auto', 'primary', 'fallback'] as const;
+export type AccountMode = (typeof ACCOUNT_MODES)[number];
+
 export const LANGUAGES = ['zh', 'en'] as const;
 export type Language = (typeof LANGUAGES)[number];
 
@@ -106,6 +109,8 @@ export interface SessionDTO {
   subagentModel: string;
   effort: EffortLevel;
   language: Language;
+  /** Which Claude seat this session uses: auto (primary→fallback) | primary | fallback. */
+  accountMode: AccountMode;
   permissionProfile: PermissionProfile;
   usage: UsageDTO;
   createdAt: string;
@@ -276,4 +281,6 @@ export interface PublicSettingsDTO {
   claudeActive: 'primary' | 'fallback'; // which account is currently active
   claudePrimaryLimitedAt: string; // ISO when primary last hit its limit, or ''
   claudeCooldownH: number; // hours before retrying primary after a switch
+  claudeModelsPrimary: string[]; // model IDs the primary seat may use
+  claudeModelsFallback: string[]; // model IDs the fallback seat may use
 }

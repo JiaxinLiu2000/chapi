@@ -175,18 +175,26 @@ export class SdkOrchestrator implements Orchestrator {
     effort?: string,
     subagentModel?: string,
     language?: string,
+    accountMode?: string,
   ): Promise<void> {
-    const data: { model?: string; effort?: string; subagentModel?: string; language?: string } = {};
+    const data: {
+      model?: string;
+      effort?: string;
+      subagentModel?: string;
+      language?: string;
+      accountMode?: string;
+    } = {};
     if (model) data.model = model;
     if (effort) data.effort = effort;
     if (subagentModel) data.subagentModel = subagentModel;
     if (language) data.language = language;
+    if (accountMode) data.accountMode = accountMode;
     if (Object.keys(data).length === 0) return;
 
     const updated = await prisma.session.update({ where: { id: sessionId }, data });
     const run = this.runs.get(sessionId);
     if (run) {
-      if (effort || language || subagentModel) {
+      if (effort || language || subagentModel || accountMode) {
         // effort/language and the sub-agent model (baked into `agents` at start) can't
         // change live — restart on next message (resume keeps context) to take effect.
         await run.stop().catch(() => undefined);

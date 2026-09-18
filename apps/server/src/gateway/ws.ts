@@ -99,6 +99,7 @@ export function attachWebSocket(server: HttpServer): WebSocketServer {
               cmd.effort,
               cmd.subagentModel,
               cmd.language,
+              cmd.accountMode,
             );
             return;
           case 'browser.view':

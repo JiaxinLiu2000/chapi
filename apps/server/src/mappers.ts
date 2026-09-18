@@ -68,6 +68,7 @@ export function toSessionDTO(s: Session): SessionDTO {
     subagentModel: s.subagentModel || s.model,
     effort: s.effort as EffortLevel,
     language: (s.language as Language) ?? 'zh',
+    accountMode: (s.accountMode as SessionDTO['accountMode']) ?? 'auto',
     permissionProfile: s.permissionProfile as PermissionProfile,
     usage: sessionUsage(s),
     createdAt: isoReq(s.createdAt),

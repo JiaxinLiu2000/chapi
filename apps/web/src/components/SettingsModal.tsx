@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { BrowserStatusResponse, UpdateSettingsInput } from '@chapi/shared';
+import { MODEL_OPTIONS, type BrowserStatusResponse, type UpdateSettingsInput } from '@chapi/shared';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Button } from './ui/Button';
@@ -63,8 +63,17 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
         claudeEmailPrimary: s.claudeEmailPrimary,
         claudeEmailFallback: s.claudeEmailFallback,
         claudeCooldownH: s.claudeCooldownH,
+        claudeModelsPrimary: s.claudeModelsPrimary,
+        claudeModelsFallback: s.claudeModelsFallback,
       });
   }, [s]);
+
+  const toggleModel = (key: 'claudeModelsPrimary' | 'claudeModelsFallback', id: string) =>
+    setForm((f) => {
+      const cur = f[key] ?? [];
+      const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
+      return { ...f, [key]: next };
+    });
 
   const [claudeMsg, setClaudeMsg] = useState('');
   const useClaudePrimary = async () => {
@@ -303,6 +312,38 @@ export function SettingsModal({ open, onClose }: { open: boolean; onClose: () =>
                 onChange={(e) => set('claudeEmailFallback', e.target.value)}
               />
             </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="mb-1 text-xs font-medium text-muted">主账号可用模型</div>
+              <div className="space-y-1">
+                {MODEL_OPTIONS.map((m) => (
+                  <label key={m.id} className="flex items-center gap-2 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={(form.claudeModelsPrimary ?? []).includes(m.id)}
+                      onChange={() => toggleModel('claudeModelsPrimary', m.id)}
+                    />
+                    {m.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="mb-1 text-xs font-medium text-muted">备账号可用模型</div>
+              <div className="space-y-1">
+                {MODEL_OPTIONS.map((m) => (
+                  <label key={m.id} className="flex items-center gap-2 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={(form.claudeModelsFallback ?? []).includes(m.id)}
+                      onChange={() => toggleModel('claudeModelsFallback', m.id)}
+                    />
+                    {m.label}
+                  </label>
+                ))}
+              </div>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-sm">

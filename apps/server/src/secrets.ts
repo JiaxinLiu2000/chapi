@@ -28,6 +28,10 @@ const KEY_CLAUDE_EMAIL_FALLBACK = 'claude_email_fallback';
 const KEY_CLAUDE_ACTIVE = 'claude_active'; // 'primary' | 'fallback'
 const KEY_CLAUDE_PRIMARY_LIMITED_AT = 'claude_primary_limited_at';
 const KEY_CLAUDE_COOLDOWN_H = 'claude_cooldown_h';
+const KEY_CLAUDE_MODELS_PRIMARY = 'claude_models_primary'; // comma-separated model IDs
+const KEY_CLAUDE_MODELS_FALLBACK = 'claude_models_fallback';
+
+const ALL_MODEL_IDS = ['claude-opus-4-8', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'];
 
 const SECRET_KEYS = new Set([
   KEY_OPENAI,
@@ -201,6 +205,20 @@ class SettingsStore {
     await this.write(KEY_CLAUDE_PRIMARY_LIMITED_AT, iso);
   }
 
+  private async modelsFor(key: string): Promise<string[]> {
+    const raw = await this.readRaw(key);
+    if (!raw) return [...ALL_MODEL_IDS];
+    const ids = raw.split(',').map((s) => s.trim()).filter(Boolean);
+    return ids.length ? ids : [...ALL_MODEL_IDS];
+  }
+
+  async getClaudeModels(): Promise<{ primary: string[]; fallback: string[] }> {
+    return {
+      primary: await this.modelsFor(KEY_CLAUDE_MODELS_PRIMARY),
+      fallback: await this.modelsFor(KEY_CLAUDE_MODELS_FALLBACK),
+    };
+  }
+
   async getPublic(): Promise<PublicSettingsDTO> {
     const models = await this.getModels();
     const google = await this.getGoogleOAuth();
@@ -225,6 +243,8 @@ class SettingsStore {
       claudeActive: (await this.getClaudeFailover()).active,
       claudePrimaryLimitedAt: (await this.readRaw(KEY_CLAUDE_PRIMARY_LIMITED_AT)) || '',
       claudeCooldownH: (await this.getClaudeFailover()).cooldownH,
+      claudeModelsPrimary: await this.modelsFor(KEY_CLAUDE_MODELS_PRIMARY),
+      claudeModelsFallback: await this.modelsFor(KEY_CLAUDE_MODELS_FALLBACK),
     };
   }
 
@@ -265,6 +285,14 @@ class SettingsStore {
       [
         KEY_CLAUDE_COOLDOWN_H,
         input.claudeCooldownH === undefined ? undefined : String(input.claudeCooldownH),
+      ],
+      [
+        KEY_CLAUDE_MODELS_PRIMARY,
+        input.claudeModelsPrimary === undefined ? undefined : input.claudeModelsPrimary.join(','),
+      ],
+      [
+        KEY_CLAUDE_MODELS_FALLBACK,
+        input.claudeModelsFallback === undefined ? undefined : input.claudeModelsFallback.join(','),
       ],
     ];
     for (const [key, value] of entries) {

@@ -39,6 +39,7 @@ export interface Orchestrator {
     effort?: string,
     subagentModel?: string,
     language?: string,
+    accountMode?: string,
   ): Promise<void>;
 
   /** True if a run is currently active for this session. */
