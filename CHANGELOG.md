@@ -4,6 +4,15 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.54 — 修复：限额自动切备用账号后，模型无权限导致直接停止
+
+- 根因:备用账号未必拥有主账号的所有模型权限(例如没有 Fable 5)。之前限额自动切备用账号时只切了账号，
+  没检查模型是否还能用，导致新起的运行立刻报错 "There's an issue with the selected model" 并停止。
+- 修复:`onRateLimit` 自动切到备用账号后，会检查当前主代理/子代理模型是否在备用账号的可用模型列表里；
+  不在的话按 `MODEL_OPTIONS` 的强弱顺序自动降级到备用账号能用的最强模型，并在切换通知里注明降级详情。
+- 顺带修了手动切账号(`ConfigSelectors`)里同一类问题:原来降级取的是设置里"勾选顺序"的第一个模型，
+  不一定是最强的；现在前后端共用新加的 `topAllowedModel()`，统一按强弱顺序选账号能用的最高模型。
+
 ## v0.1.53 — 修复：双账号都限额后，运行卡死、回复无反应
 
 - 根因:两个 Claude 账号(主/备)在同一会话里都被打到使用限额后,`Run` 只是把主代理/子代理/质检标成空闲、

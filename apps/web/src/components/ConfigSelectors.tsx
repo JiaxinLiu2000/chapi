@@ -2,6 +2,7 @@
 import {
   EFFORT_LEVELS,
   MODEL_OPTIONS,
+  topAllowedModel,
   type AccountMode,
   type EffortLevel,
   type Language,
@@ -86,8 +87,8 @@ export function ConfigSelectors({
       : null;
     const partial: Partial<RunConfig> = { accountMode: mode };
     if (tokensConfigured && next && next.length) {
-      if (!next.includes(value.model)) partial.model = next[0];
-      if (!next.includes(value.subagentModel)) partial.subagentModel = next[0];
+      if (!next.includes(value.model)) partial.model = topAllowedModel(next);
+      if (!next.includes(value.subagentModel)) partial.subagentModel = topAllowedModel(next);
     }
     onChange(partial);
   };

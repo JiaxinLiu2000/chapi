@@ -71,6 +71,21 @@ export const MODEL_OPTIONS = [
   { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5 · 最快' },
 ] as const;
 
+/**
+ * The best model an account can use, ranked by `MODEL_OPTIONS` order (strongest
+ * first). Used to downgrade gracefully when a model isn't available on an account
+ * (e.g. switching to a fallback seat without Fable 5 access) — both on a manual
+ * account switch and an automatic rate-limit failover.
+ */
+export function topAllowedModel(allowedIds: readonly string[] | undefined | null): string {
+  if (allowedIds && allowedIds.length) {
+    const ranked = MODEL_OPTIONS.find((m) => allowedIds.includes(m.id));
+    if (ranked) return ranked.id;
+    return allowedIds[0]!;
+  }
+  return MODEL_OPTIONS[0].id;
+}
+
 export const NOTIFICATION_LEVELS = ['info', 'question', 'success', 'error'] as const;
 export type NotificationLevel = (typeof NOTIFICATION_LEVELS)[number];
 

@@ -1,4 +1,4 @@
-import type { ContentBlock } from '@chapi/shared';
+import { MODEL_OPTIONS, topAllowedModel, type ContentBlock } from '@chapi/shared';
 import { prisma } from '../db/client.js';
 import { bus } from '../gateway/bus.js';
 import { createLogger } from '../logger.js';
@@ -7,6 +7,7 @@ import type { Orchestrator } from '../orchestrator/types.js';
 import { setSessionStatus } from '../services/sessions.js';
 import { consolidateSession } from '../learning/consolidate.js';
 import { summarizeSession } from '../learning/summarize.js';
+import { settings } from '../secrets.js';
 import { hitl } from './hitl.js';
 import { Run, type QueryFn } from './run.js';
 import { switchToFallback } from './accounts.js';
@@ -161,12 +162,45 @@ export class SdkOrchestrator implements Orchestrator {
       return;
     }
 
+    // The fallback seat may not have access to every model the primary seat does
+    // (e.g. no Fable 5). Downgrade any model the session was using that the
+    // fallback can't run — otherwise the run would immediately die with "There's
+    // an issue with the selected model" right after failing over.
+    const session = await prisma.session.findUnique({ where: { id: sessionId } });
+    const downgrades: string[] = [];
+    if (session) {
+      const allowed = (await settings.getClaudeModels()).fallback;
+      const data: { model?: string; subagentModel?: string } = {};
+      if (allowed.length && !allowed.includes(session.model)) {
+        data.model = topAllowedModel(allowed);
+        downgrades.push(
+          `主代理 ${MODEL_OPTIONS.find((m) => m.id === session.model)?.label ?? session.model} → ${
+            MODEL_OPTIONS.find((m) => m.id === data.model)?.label ?? data.model
+          }`,
+        );
+      }
+      if (allowed.length && !allowed.includes(session.subagentModel)) {
+        data.subagentModel = topAllowedModel(allowed);
+        downgrades.push(
+          `子代理 ${MODEL_OPTIONS.find((m) => m.id === session.subagentModel)?.label ?? session.subagentModel} → ${
+            MODEL_OPTIONS.find((m) => m.id === data.subagentModel)?.label ?? data.subagentModel
+          }`,
+        );
+      }
+      if (Object.keys(data).length) {
+        const updated = await prisma.session.update({ where: { id: sessionId }, data });
+        bus.emit({ type: 'session.updated', session: toSessionDTO(updated) });
+      }
+    }
+
     bus.emit({
       type: 'notification',
       sessionId,
       level: 'info',
       title: '已切换到备用账号',
-      body: `主账号已达使用限额，已切换到备用账号 ${fallback.email} 并自动重试。`,
+      body: `主账号已达使用限额，已切换到备用账号 ${fallback.email} 并自动重试。${
+        downgrades.length ? `备用账号无权限使用原模型，已自动降级：${downgrades.join('；')}。` : ''
+      }`,
     });
 
     if (lastUserText.trim()) {
