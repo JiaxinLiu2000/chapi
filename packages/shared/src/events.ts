@@ -148,6 +148,7 @@ export const clientCommandSchema = z.discriminatedUnion('type', [
     effort: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional(),
     language: z.enum(['zh', 'en']).optional(),
     accountMode: z.enum(['auto', 'primary', 'fallback']).optional(),
+    qualityReviewMinutes: z.number().int().min(0).max(120).optional(),
   }),
   z.object({ type: z.literal('ping') }),
 ]);

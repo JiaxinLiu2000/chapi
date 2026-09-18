@@ -69,6 +69,7 @@ export function toSessionDTO(s: Session): SessionDTO {
     effort: s.effort as EffortLevel,
     language: (s.language as Language) ?? 'zh',
     accountMode: (s.accountMode as SessionDTO['accountMode']) ?? 'auto',
+    qualityReviewMinutes: s.qualityReviewMinutes ?? 0,
     permissionProfile: s.permissionProfile as PermissionProfile,
     usage: sessionUsage(s),
     createdAt: isoReq(s.createdAt),

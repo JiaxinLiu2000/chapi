@@ -30,6 +30,7 @@ export default function HomePage() {
     effort: 'max',
     language: 'zh',
     accountMode: 'auto',
+    qualityReviewMinutes: 0,
   });
   // Seed the model dropdowns from the configured defaults once settings load.
   useEffect(() => {
@@ -53,6 +54,7 @@ export default function HomePage() {
         effort: cfg.effort,
         language: cfg.language,
         accountMode: cfg.accountMode,
+        qualityReviewMinutes: cfg.qualityReviewMinutes,
       });
 
       let uploaded;

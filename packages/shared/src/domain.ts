@@ -112,6 +112,8 @@ export interface SessionDTO {
   language: Language;
   /** Which Claude seat this session uses: auto (primary→fallback) | primary | fallback. */
   accountMode: AccountMode;
+  /** Periodic quality-review interval in minutes; 0 = off. */
+  qualityReviewMinutes: number;
   permissionProfile: PermissionProfile;
   usage: UsageDTO;
   createdAt: string;

@@ -78,6 +78,9 @@ export async function createSession(input: CreateSessionInput): Promise<SessionD
       ...(input.effort ? { effort: input.effort } : {}),
       ...(input.language ? { language: input.language } : {}),
       ...(input.accountMode ? { accountMode: input.accountMode } : {}),
+      ...(input.qualityReviewMinutes !== undefined
+        ? { qualityReviewMinutes: input.qualityReviewMinutes }
+        : {}),
     },
   });
 

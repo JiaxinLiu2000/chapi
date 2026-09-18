@@ -4,6 +4,13 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.52 — 自动质检频率可在下拉框调
+
+- 选择器里新增**「质检」下拉**(关闭 / 每 5 / 10 / 15 / 30 / 60 分钟),主页新建对话与会话顶栏都有。
+  选了就**自动开启定时质检**、按该频率评估阶段性产物;选「关闭」即停。用户直接控频率,不必依赖主代理去开。
+- per-session(`Session.qualityReviewMinutes`,0=关);`set.config`/`createSession` 均可设;设为 >0 时驱动
+  `scheduler.scheduleQualityReview`,active 会话发消息时也会按此重新武装(服务端重启后自动恢复)。
+
 ## v0.1.51 — 主页新建对话处也能选账号/模型/强度/语言
 
 - 主页(新建对话)在输入框下方新增一整排选择器:**账号 / 主代理 / 子代理 / 思考强度 / 语言**——开新会话前就能选好,

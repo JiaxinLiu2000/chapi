@@ -40,6 +40,7 @@ export interface Orchestrator {
     subagentModel?: string,
     language?: string,
     accountMode?: string,
+    qualityReviewMinutes?: number,
   ): Promise<void>;
 
   /** True if a run is currently active for this session. */

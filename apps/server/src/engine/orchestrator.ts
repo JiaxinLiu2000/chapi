@@ -58,6 +58,13 @@ export class SdkOrchestrator implements Orchestrator {
 
     await this.getRun(sessionId).pushUserMessage(text);
 
+    // Arm the periodic quality reviewer if this session has a cadence set (re-arms
+    // after a server restart, since the timers are in-memory).
+    const qrm = session.qualityReviewMinutes ?? 0;
+    if (qrm > 0 && !scheduler.isQualityReviewOn(sessionId)) {
+      scheduler.scheduleQualityReview(sessionId, qrm * 60_000);
+    }
+
     // Every 5 user rounds: roll up a summary to save context (fire-and-forget).
     if (updated.roundCount > 0 && updated.roundCount % 5 === 0) {
       void summarizeSession(sessionId);
@@ -176,6 +183,7 @@ export class SdkOrchestrator implements Orchestrator {
     subagentModel?: string,
     language?: string,
     accountMode?: string,
+    qualityReviewMinutes?: number,
   ): Promise<void> {
     const data: {
       model?: string;
@@ -183,15 +191,23 @@ export class SdkOrchestrator implements Orchestrator {
       subagentModel?: string;
       language?: string;
       accountMode?: string;
+      qualityReviewMinutes?: number;
     } = {};
     if (model) data.model = model;
     if (effort) data.effort = effort;
     if (subagentModel) data.subagentModel = subagentModel;
     if (language) data.language = language;
     if (accountMode) data.accountMode = accountMode;
+    if (qualityReviewMinutes !== undefined) data.qualityReviewMinutes = qualityReviewMinutes;
     if (Object.keys(data).length === 0) return;
 
     const updated = await prisma.session.update({ where: { id: sessionId }, data });
+
+    // Quality-review cadence: start/stop the recurring reviewer (no run restart needed).
+    if (qualityReviewMinutes !== undefined) {
+      if (qualityReviewMinutes > 0) scheduler.scheduleQualityReview(sessionId, qualityReviewMinutes * 60_000);
+      else scheduler.cancelQualityReview(sessionId);
+    }
     const run = this.runs.get(sessionId);
     if (run) {
       if (effort || language || subagentModel || accountMode) {

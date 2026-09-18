@@ -14,7 +14,17 @@ export interface RunConfig {
   effort: EffortLevel;
   language: Language;
   accountMode: AccountMode;
+  qualityReviewMinutes: number; // 0 = off
 }
+
+const QR_OPTIONS: { v: number; label: string }[] = [
+  { v: 0, label: '关闭' },
+  { v: 5, label: '每 5 分钟' },
+  { v: 10, label: '每 10 分钟' },
+  { v: 15, label: '每 15 分钟' },
+  { v: 30, label: '每 30 分钟' },
+  { v: 60, label: '每 60 分钟' },
+];
 
 const effortLabel: Record<EffortLevel, string> = {
   low: '低',
@@ -156,6 +166,21 @@ export function ConfigSelectors({
       >
         <option value="zh">中文</option>
         <option value="en">English</option>
+      </select>
+
+      <span className="ml-3 text-xs text-muted">质检</span>
+      <select
+        className={selectCls}
+        value={value.qualityReviewMinutes}
+        disabled={disabled}
+        onChange={(e) => onChange({ qualityReviewMinutes: Number(e.target.value) })}
+        title="自动质检频率:每隔多久评估一次阶段性产物(关闭则不自动质检)"
+      >
+        {QR_OPTIONS.map((o) => (
+          <option key={o.v} value={o.v}>
+            {o.label}
+          </option>
+        ))}
       </select>
     </>
   );

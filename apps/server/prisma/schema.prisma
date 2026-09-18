@@ -18,6 +18,7 @@ model Session {
   effort              String   @default("max") // low | medium | high | xhigh | max
   language            String   @default("zh") // zh | en — language for talking to the user
   accountMode         String   @default("auto") // auto | primary | fallback — Claude seat selection
+  qualityReviewMinutes Int     @default(0) // 0=off; else periodic quality-review interval (min)
   permissionProfile   String   @default("web") // web | vscode
   sdkSessionId        String? // Claude Agent SDK session id, for resume
   // usage / monitoring rollups

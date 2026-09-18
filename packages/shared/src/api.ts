@@ -29,6 +29,7 @@ export const createSessionSchema = z.object({
   effort: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional(),
   language: z.enum(['zh', 'en']).optional(),
   accountMode: z.enum(['auto', 'primary', 'fallback']).optional(),
+  qualityReviewMinutes: z.number().int().min(0).max(120).optional(),
 });
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;
 

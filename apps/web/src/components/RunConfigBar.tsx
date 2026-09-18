@@ -17,6 +17,7 @@ export function RunConfigBar({ sessionId }: { sessionId: string }) {
     effort: (session?.effort as EffortLevel) ?? 'high',
     language: (session?.language as Language) ?? 'zh',
     accountMode: (session?.accountMode as AccountMode) ?? 'auto',
+    qualityReviewMinutes: session?.qualityReviewMinutes ?? 0,
   };
 
   // Optimistic local update + persist per-session. A single onChange may carry several
