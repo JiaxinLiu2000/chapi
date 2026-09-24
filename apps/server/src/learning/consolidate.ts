@@ -79,7 +79,14 @@ ${artifactsText}
 ${transcript}`;
 
   try {
-    const out = await complete({ system, prompt, model: session?.model || undefined });
+    const out = await complete({
+      system,
+      prompt,
+      model: session?.model || undefined,
+      accountMode: (session?.accountMode as 'auto' | 'primary' | 'fallback') || undefined,
+      sessionId,
+      trigger: 'consolidate',
+    });
     const entries = JSON.parse(extractJsonArray(out)) as ProposedEntry[];
     let n = 0;
     for (const e of entries) {

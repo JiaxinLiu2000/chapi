@@ -53,6 +53,7 @@ export class Run {
   private loop: Promise<void> | null = null;
   private account: AccountName = 'machine'; // Claude seat this run is using
   private accountMode: 'auto' | 'primary' | 'fallback' = 'auto'; // session's seat selection
+  private currentModel = ''; // model this run started with, for the usage ledger
   private lastUserText = ''; // last user turn, replayed on account failover
   private failingOver = false; // guard: fail over at most once per run
 
@@ -83,6 +84,7 @@ export class Run {
   /** Live model switch (streaming-input mode). Effort changes require a fresh run. */
   async setModel(model: string): Promise<void> {
     await this.q?.setModel(model).catch((err) => log.warn('setModel failed', err));
+    this.currentModel = model;
   }
 
   async stop(): Promise<void> {
@@ -112,6 +114,12 @@ export class Run {
     this.accountMode = (session.accountMode as 'auto' | 'primary' | 'fallback') ?? 'auto';
     const acct = await chooseActiveAccount(this.accountMode);
     this.account = acct.name;
+    this.currentModel = session.model;
+    log.info(
+      `session ${this.sessionId}: run starting with account=${acct.name}${
+        acct.email ? ` (${acct.email})` : ''
+      } mode=${this.accountMode} model=${session.model}`,
+    );
     const maxSubagents = await settings.getMaxSubagents();
     const canUseTool = buildCanUseTool(
       session.id,
@@ -338,6 +346,24 @@ export class Run {
     const output = u.output_tokens ?? 0;
     const cacheRead = u.cache_read_input_tokens ?? 0;
     const cacheCreation = u.cache_creation_input_tokens ?? 0;
+
+    // Per-call usage ledger — records which seat actually served this turn, so
+    // "which account is draining tokens" is a query instead of log archaeology.
+    if (this.account !== 'machine') {
+      await prisma.usageEvent
+        .create({
+          data: {
+            sessionId: this.sessionId,
+            account: this.account,
+            trigger: 'user_turn',
+            model: this.currentModel,
+            inputTokens: input,
+            outputTokens: output,
+            costUsd: m.total_cost_usd ?? 0,
+          },
+        })
+        .catch((err) => log.warn('usage event create failed', err));
+    }
 
     const updated = await prisma.session.update({
       where: { id: this.sessionId },

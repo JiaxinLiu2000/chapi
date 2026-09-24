@@ -4,6 +4,22 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.58 — 新增按账号/会话可查询的用量流水（排查"谁在消耗哪个账号"）
+
+- 背景:用户反馈备用账号被单方面快速消耗、且消耗速度远超以前，但之前完全没有"每次调用具体用了
+  哪个账号、花了多少钱"的可查询记录——只有零散的日志和 `Session.usage` 总量，没法精确定位来源。
+- 新增 `UsageEvent` 表，记录每一次真实调用：`sessionId`、`account`(primary/fallback/machine)、
+  `trigger`(user_turn/quality_review/summarize/consolidate)、`model`、tokens、`costUsd`。
+  在三处真实调用点落盘:主/子代理每个 turn([run.ts](apps/server/src/engine/run.ts) 的
+  `handleResult`)、质检的一次性调用([quality.ts](apps/server/src/engine/quality.ts) 的
+  `evaluate`)、摘要/复盘的一次性调用([llm.ts](apps/server/src/engine/llm.ts) 的 `complete`)。
+- 新增只读接口 `GET /api/usage?windowMin=60`：按账号聚合调用次数/花费，并按花费排出 Top 20 会话，
+  几秒钟就能看出是哪个账号、哪个会话、哪种触发方式在猛烈消耗。
+- 另外在 `run.ts` 的 `ensureStarted()` 加了一行日志，每次真正起一个新 Run 时打印实际用的账号
+  (primary/fallback + 邮箱) 和 `accountMode`，方便直接在控制台确认账号切换是否生效。
+- 本轮范围明确为"仅做可观测性"，不含自动熔断失控会话——等这套数据用起来、验证清楚消耗模式后，
+  如果还需要自动熔断/暂停，再单独讨论阈值。
+
 ## v0.1.57 — 修复：反复重试会把限额冷却时间越推越晚
 
 - 根因(有真实日志佐证):v0.1.56 每次收到限额都会把该账号的"限额时间"重新打成当前时间。但如果

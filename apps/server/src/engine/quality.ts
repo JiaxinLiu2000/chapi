@@ -51,12 +51,14 @@ function parseVerdict(text: string): Verdict | null {
 }
 
 async function evaluate(
+  sessionId: string,
   sandbox: string,
   plan: PlanTask[],
   artifacts: Artifact[],
   goal: string,
+  accountMode: 'auto' | 'primary' | 'fallback',
 ): Promise<Verdict | null> {
-  const acct = await chooseActiveAccount();
+  const acct = await chooseActiveAccount(accountMode);
   const model = (await settings.getModels()).subagent;
   const planStr = plan.map((t) => `- [${t.status}] ${t.text}`).join('\n') || '(无任务流)';
   const artStr =
@@ -92,6 +94,8 @@ async function evaluate(
   });
 
   let text = '';
+  let usage: { input_tokens?: number; output_tokens?: number } = {};
+  let costUsd = 0;
   for await (const m of q) {
     if (m.type === 'assistant') {
       const am = m as { error?: string; message?: { content?: unknown } };
@@ -100,8 +104,29 @@ async function evaluate(
       if (Array.isArray(c))
         for (const b of c as Array<{ type?: string; text?: string }>)
           if (b.type === 'text') text += b.text ?? '';
+    } else if (m.type === 'result') {
+      const rm = m as { usage?: typeof usage; total_cost_usd?: number };
+      usage = rm.usage ?? {};
+      costUsd = rm.total_cost_usd ?? 0;
     }
   }
+
+  if (acct.name !== 'machine') {
+    await prisma.usageEvent
+      .create({
+        data: {
+          sessionId,
+          account: acct.name,
+          trigger: 'quality_review',
+          model,
+          inputTokens: usage.input_tokens ?? 0,
+          outputTokens: usage.output_tokens ?? 0,
+          costUsd,
+        },
+      })
+      .catch((err) => log.warn('usage event create failed', err));
+  }
+
   return parseVerdict(text);
 }
 
@@ -130,7 +155,8 @@ export async function runQualityReview(sessionId: string): Promise<void> {
   bus.emit({ type: 'agent.status', sessionId, agent: toAgentRunDTO(agentRun) });
 
   const goal = firstUser?.text?.trim() || session.title;
-  const verdict = await evaluate(sessionPaths(sessionId).sandbox, plan, artifacts, goal).catch((e) => {
+  const accountMode = (session.accountMode as 'auto' | 'primary' | 'fallback') ?? 'auto';
+  const verdict = await evaluate(sessionId, sessionPaths(sessionId).sandbox, plan, artifacts, goal, accountMode).catch((e) => {
     log.warn('quality review failed', e);
     return null;
   });

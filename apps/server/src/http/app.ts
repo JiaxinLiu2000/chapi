@@ -7,6 +7,7 @@ import { settingsRoutes } from './routes/settings.js';
 import { wikiRoutes } from './routes/wiki.js';
 import { uploadRoutes } from './routes/uploads.js';
 import { browserRoutes } from './routes/browser.js';
+import { usageRoutes } from './routes/usage.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: false, bodyLimit: 25 * 1024 * 1024 });
@@ -45,6 +46,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(wikiRoutes, { prefix: '/api' });
   await app.register(uploadRoutes, { prefix: '/api' });
   await app.register(browserRoutes, { prefix: '/api' });
+  await app.register(usageRoutes, { prefix: '/api' });
 
   return app;
 }
