@@ -22,7 +22,7 @@ import { buildExternalMcpServers } from './tools/mcpRegistry.js';
 import { latestSummary } from '../learning/summarize.js';
 import { ensureSandboxHelpers } from '../services/workspaces.js';
 import { sessionPaths } from '../config.js';
-import { chooseActiveAccount, type AccountName } from './accounts.js';
+import { chooseActiveAccount, clearAccountLimit, recordAccountLimited, type AccountName } from './accounts.js';
 import { getOrchestrator } from '../orchestrator/types.js';
 
 const log = createLogger('engine:run');
@@ -214,8 +214,33 @@ export class Run {
       case 'result':
         await this.handleResult(msg);
         return;
+      case 'rate_limit_event':
+        await this.handleRateLimitEvent(msg);
+        return;
       default:
         return;
+    }
+  }
+
+  /**
+   * The SDK's authoritative rate-limit status for the seat this run is using
+   * (real `resetsAt` from Anthropic, not a guess). Bookkeeping only — the actual
+   * failover trigger is still the terminal `assistant.error === 'rate_limit'`
+   * handled in `handleAssistant`; this just makes sure whichever seat we record
+   * as limited gets the real reset time instead of a blind cooldown guess, and
+   * lets us proactively clear a seat the moment Anthropic reports it's usable
+   * again (instead of waiting out our own estimate).
+   */
+  private async handleRateLimitEvent(msg: SDKMessage): Promise<void> {
+    const account = this.account;
+    if (account === 'machine') return;
+    const m = msg as { rate_limit_info?: { status?: string; resetsAt?: number } };
+    const info = m.rate_limit_info;
+    if (!info?.status) return;
+    if (info.status === 'rejected') {
+      await recordAccountLimited(account, { status: 'rejected', resetsAt: info.resetsAt });
+    } else {
+      await clearAccountLimit(account);
     }
   }
 

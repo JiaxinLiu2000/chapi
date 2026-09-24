@@ -4,6 +4,23 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.59 — 修复：一个号打满后，会误判另一个号也到限额了
+
+- 根因:chapi 之前判断"账号是否限额"只看粗糙信号——某条 `assistant` 消息带 `error === 'rate_limit'`，
+  一旦命中就凭空猜一个固定冷却时长(默认 5 小时)，跟 Anthropic 真实的重置时间毫无关系。
+  两次实测都是:主号刚被标记限额、立刻切到备用号重试，备用号在 2~3 秒内也被打上"限额"标签
+  (各自套上独立的 5 小时倒计时)，于是两个号一起被冻结，`onRateLimit` 的判断逻辑一看两边都有
+  限额标记就直接放弃、弹"两个账号均已达使用限额"，跟账号是否真的恢复完全无关。
+- 修复:Claude Agent SDK 其实自带一个专门的 `rate_limit_event` 消息(`rate_limit_info.status` +
+  真实的 `resetsAt`)，之前完全没有处理、直接被 `run.ts` 的消息分发丢弃。现在监听这个事件:
+  真实限额用 SDK 报的 `resetsAt`(权威、不用猜)；账号状态转回可用时立即解除标记，不用干等。
+  只有完全没收到过这个事件时，才退回"猜 `cooldownH` 小时"的兜底逻辑，且同一次限额不会被
+  重复重试再往后推(修复 v0.1.57 的"冷却时钟被越推越晚"问题的根)。
+- 存储字段从"什么时候被标记限额"(`claude_primary/fallback_limited_at`)改为"真实几点恢复"
+  (`claude_primary/fallback_reset_at`)，语义更准确；已清掉这次事故里被误标的旧值。
+- 新增 [accounts.test.ts](apps/server/src/engine/accounts.test.ts)（7 个用例）覆盖：真实 `resetsAt`
+  优先于猜测、猜测不会被重复重试推迟、真实数据可以纠正过时的猜测、两边都限额时选恢复更快的那个。
+
 ## v0.1.58 — 新增按账号/会话可查询的用量流水（排查"谁在消耗哪个账号"）
 
 - 背景:用户反馈备用账号被单方面快速消耗、且消耗速度远超以前，但之前完全没有"每次调用具体用了

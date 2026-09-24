@@ -297,7 +297,7 @@ export interface PublicSettingsDTO {
   claudeEmailPrimary: string;
   claudeEmailFallback: string;
   claudeActive: 'primary' | 'fallback'; // which account is currently active
-  claudePrimaryLimitedAt: string; // ISO when primary last hit its limit, or ''
+  claudePrimaryResetAt: string; // ISO when primary's rate limit resets (real or estimated), or ''
   claudeCooldownH: number; // hours before retrying primary after a switch
   claudeModelsPrimary: string[]; // model IDs the primary seat may use
   claudeModelsFallback: string[]; // model IDs the fallback seat may use

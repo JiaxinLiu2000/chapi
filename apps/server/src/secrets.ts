@@ -26,8 +26,10 @@ const KEY_CLAUDE_TOKEN_FALLBACK = 'claude_token_fallback';
 const KEY_CLAUDE_EMAIL_PRIMARY = 'claude_email_primary';
 const KEY_CLAUDE_EMAIL_FALLBACK = 'claude_email_fallback';
 const KEY_CLAUDE_ACTIVE = 'claude_active'; // 'primary' | 'fallback'
-const KEY_CLAUDE_PRIMARY_LIMITED_AT = 'claude_primary_limited_at';
-const KEY_CLAUDE_FALLBACK_LIMITED_AT = 'claude_fallback_limited_at';
+// ISO timestamp for when a seat's rate limit resets — the SDK's real `resetsAt`
+// when known, else a `claude_cooldown_h`-based guess (see accounts.ts).
+const KEY_CLAUDE_PRIMARY_RESET_AT = 'claude_primary_reset_at';
+const KEY_CLAUDE_FALLBACK_RESET_AT = 'claude_fallback_reset_at';
 const KEY_CLAUDE_COOLDOWN_H = 'claude_cooldown_h';
 const KEY_CLAUDE_MODELS_PRIMARY = 'claude_models_primary'; // comma-separated model IDs
 const KEY_CLAUDE_MODELS_FALLBACK = 'claude_models_fallback';
@@ -191,16 +193,16 @@ class SettingsStore {
 
   async getClaudeFailover(): Promise<{
     active: 'primary' | 'fallback';
-    primaryLimitedAt: string;
-    fallbackLimitedAt: string;
+    primaryResetAt: string;
+    fallbackResetAt: string;
     cooldownH: number;
   }> {
     const active = (await this.readRaw(KEY_CLAUDE_ACTIVE)) === 'fallback' ? 'fallback' : 'primary';
     const n = Number.parseInt((await this.readRaw(KEY_CLAUDE_COOLDOWN_H)) || '5', 10);
     return {
       active,
-      primaryLimitedAt: (await this.readRaw(KEY_CLAUDE_PRIMARY_LIMITED_AT)) || '',
-      fallbackLimitedAt: (await this.readRaw(KEY_CLAUDE_FALLBACK_LIMITED_AT)) || '',
+      primaryResetAt: (await this.readRaw(KEY_CLAUDE_PRIMARY_RESET_AT)) || '',
+      fallbackResetAt: (await this.readRaw(KEY_CLAUDE_FALLBACK_RESET_AT)) || '',
       cooldownH: Number.isFinite(n) ? Math.min(72, Math.max(1, n)) : 5,
     };
   }
@@ -209,12 +211,12 @@ class SettingsStore {
     await this.write(KEY_CLAUDE_ACTIVE, v);
   }
 
-  async setClaudePrimaryLimitedAt(iso: string): Promise<void> {
-    await this.write(KEY_CLAUDE_PRIMARY_LIMITED_AT, iso);
+  async setClaudePrimaryResetAt(iso: string): Promise<void> {
+    await this.write(KEY_CLAUDE_PRIMARY_RESET_AT, iso);
   }
 
-  async setClaudeFallbackLimitedAt(iso: string): Promise<void> {
-    await this.write(KEY_CLAUDE_FALLBACK_LIMITED_AT, iso);
+  async setClaudeFallbackResetAt(iso: string): Promise<void> {
+    await this.write(KEY_CLAUDE_FALLBACK_RESET_AT, iso);
   }
 
   private async modelsFor(key: string): Promise<string[]> {
@@ -253,7 +255,7 @@ class SettingsStore {
       claudeEmailPrimary: (await this.readRaw(KEY_CLAUDE_EMAIL_PRIMARY)) || 'jiaxin.liu@unitpulse.ai',
       claudeEmailFallback: (await this.readRaw(KEY_CLAUDE_EMAIL_FALLBACK)) || 'liu.j37@northeastern.edu',
       claudeActive: (await this.getClaudeFailover()).active,
-      claudePrimaryLimitedAt: (await this.readRaw(KEY_CLAUDE_PRIMARY_LIMITED_AT)) || '',
+      claudePrimaryResetAt: (await this.readRaw(KEY_CLAUDE_PRIMARY_RESET_AT)) || '',
       claudeCooldownH: (await this.getClaudeFailover()).cooldownH,
       claudeModelsPrimary: await this.modelsFor(KEY_CLAUDE_MODELS_PRIMARY),
       claudeModelsFallback: await this.modelsFor(KEY_CLAUDE_MODELS_FALLBACK),

@@ -173,12 +173,12 @@ export class SdkOrchestrator implements Orchestrator {
 
     const target = await chooseActiveAccount('auto');
     const fo = await settings.getClaudeFailover();
-    // chooseActiveAccount clears a seat's limited marker once it's actually ready —
+    // chooseActiveAccount clears a seat's reset marker once it's actually ready —
     // if the seat it landed on still has one set, both seats are currently limited
     // and this was just the soonest-to-recover pick, not a real fix yet.
     const stillLimited =
-      (target.name === 'primary' && Boolean(fo.primaryLimitedAt)) ||
-      (target.name === 'fallback' && Boolean(fo.fallbackLimitedAt));
+      (target.name === 'primary' && Boolean(fo.primaryResetAt)) ||
+      (target.name === 'fallback' && Boolean(fo.fallbackResetAt));
     const toLabel = target.name === 'primary' ? '主账号' : '备用账号';
 
     if (stillLimited) {
