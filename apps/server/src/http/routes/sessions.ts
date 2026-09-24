@@ -5,6 +5,7 @@ import { getOrchestrator } from '../../orchestrator/types.js';
 import {
   createSession,
   deleteSession,
+  getEarlierMessages,
   getSessionBySlug,
   getSessionDetail,
   listSessions,
@@ -29,6 +30,17 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     if (!detail) return reply.status(404).send({ error: 'session not found' });
     return detail;
   });
+
+  // Infinite-scroll-up: page in messages older than `before`, oldest-to-newest.
+  app.get<{ Params: { id: string }; Querystring: { before?: string; limit?: string } }>(
+    '/sessions/:id/messages',
+    async (req, reply) => {
+      const { before, limit } = req.query;
+      if (!before) return reply.status(400).send({ error: 'before is required' });
+      const n = Math.max(1, Math.min(500, Number(limit) || 200));
+      return getEarlierMessages(req.params.id, before, n);
+    },
+  );
 
   app.get<{ Params: { slug: string } }>(
     '/sessions/by-slug/:slug',

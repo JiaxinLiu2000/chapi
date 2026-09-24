@@ -47,6 +47,8 @@ interface ChapiState {
   sessionId: string | null;
   session: SessionDTO | null;
   messages: MessageDTO[];
+  /** True when older messages exist beyond the initial page (see `prependMessages`). */
+  hasMoreMessages: boolean;
   streaming: string;
   plan: PlanTaskDTO[];
   agents: AgentRunDTO[];
@@ -65,6 +67,8 @@ interface ChapiState {
 
   setSessions: (s: SessionDTO[]) => void;
   loadDetail: (d: SessionDetailResponse) => void;
+  /** Prepend an older page of messages (infinite-scroll-up), oldest-to-newest. */
+  prependMessages: (msgs: MessageDTO[], hasMore: boolean) => void;
   resetActive: () => void;
   setBrowserViewOn: (on: boolean) => void;
   clearToast: () => void;
@@ -85,6 +89,7 @@ export const useStore = create<ChapiState>((set, get) => ({
   sessionId: null,
   session: null,
   messages: [],
+  hasMoreMessages: false,
   streaming: '',
   plan: [],
   agents: [],
@@ -107,6 +112,7 @@ export const useStore = create<ChapiState>((set, get) => ({
       sessionId: d.session.id,
       session: d.session,
       messages: d.messages,
+      hasMoreMessages: d.hasMoreMessages,
       streaming: '',
       plan: d.plan,
       agents: d.agents,
@@ -126,6 +132,7 @@ export const useStore = create<ChapiState>((set, get) => ({
       sessionId: null,
       session: null,
       messages: [],
+      hasMoreMessages: false,
       streaming: '',
       plan: [],
       agents: [],
@@ -139,6 +146,9 @@ export const useStore = create<ChapiState>((set, get) => ({
       browserPageCount: 1,
       browserViewOn: false,
     }),
+
+  prependMessages: (msgs, hasMore) =>
+    set((s) => ({ messages: [...msgs, ...s.messages], hasMoreMessages: hasMore })),
 
   clearToast: () => set({ toast: null }),
 

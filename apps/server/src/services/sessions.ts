@@ -104,30 +104,67 @@ export async function getSessionBySlug(slug: string): Promise<SessionDTO | null>
   return s ? toSessionDTO(s) : null;
 }
 
+// Long sessions can accumulate thousands of messages; loading and rendering them
+// all at once is what makes the chat sluggish to open. Only the most recent page
+// loads up front — older ones page in on demand via getEarlierMessages().
+const MESSAGE_PAGE_SIZE = 200;
+
 export async function getSessionDetail(
   id: string,
 ): Promise<SessionDetailResponse | null> {
   const session = await prisma.session.findUnique({ where: { id } });
   if (!session) return null;
   await reconcileAgents(id);
-  const [messages, plan, agents, artifacts, attachments, openQuestions] =
+  const [messageCount, recentMessagesDesc, plan, agents, artifacts, attachments, openQuestions] =
     await Promise.all([
-      prisma.message.findMany({ where: { sessionId: id }, orderBy: { createdAt: 'asc' } }),
+      prisma.message.count({ where: { sessionId: id } }),
+      prisma.message.findMany({
+        where: { sessionId: id },
+        orderBy: { createdAt: 'desc' },
+        take: MESSAGE_PAGE_SIZE,
+      }),
       prisma.planTask.findMany({ where: { sessionId: id }, orderBy: { ordinal: 'asc' } }),
       prisma.agentRun.findMany({ where: { sessionId: id }, orderBy: { createdAt: 'asc' } }),
       prisma.artifact.findMany({ where: { sessionId: id }, orderBy: { createdAt: 'asc' } }),
       prisma.attachment.findMany({ where: { sessionId: id }, orderBy: { createdAt: 'asc' } }),
       prisma.pendingQuestion.findMany({ where: { sessionId: id, status: 'open' } }),
     ]);
+  const messages = recentMessagesDesc.slice().reverse();
   return {
     session: toSessionDTO(session),
     messages: messages.map(toMessageDTO),
+    hasMoreMessages: messageCount > messages.length,
     plan: plan.map(toPlanTaskDTO),
     agents: agents.map(toAgentRunDTO),
     artifacts: artifacts.map(toArtifactDTO),
     attachments: attachments.map(toAttachmentDTO),
     openQuestions: openQuestions.map(toPendingQuestionDTO),
   };
+}
+
+/**
+ * A page of messages strictly older than `beforeMessageId`, oldest-to-newest —
+ * for the chat's infinite-scroll-up. `hasMore` tells the client whether to keep
+ * offering to load further back.
+ */
+export async function getEarlierMessages(
+  sessionId: string,
+  beforeMessageId: string,
+  limit = MESSAGE_PAGE_SIZE,
+): Promise<{ messages: ReturnType<typeof toMessageDTO>[]; hasMore: boolean }> {
+  const anchor = await prisma.message.findUnique({
+    where: { id: beforeMessageId },
+    select: { createdAt: true },
+  });
+  if (!anchor) return { messages: [], hasMore: false };
+  const rows = await prisma.message.findMany({
+    where: { sessionId, createdAt: { lt: anchor.createdAt } },
+    orderBy: { createdAt: 'desc' },
+    take: limit + 1,
+  });
+  const hasMore = rows.length > limit;
+  const page = rows.slice(0, limit).reverse();
+  return { messages: page.map(toMessageDTO), hasMore };
 }
 
 /**

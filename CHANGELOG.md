@@ -4,6 +4,28 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.61 — 修复：任务/上下文很长时对话框卡顿
+
+- 根因 1(最大来源)：AI 每吐一个字符/片段，`streaming` 状态就变一次，[Chat.tsx](apps/web/src/components/Chat.tsx)
+  和它渲染的 [MessageList.tsx](apps/web/src/components/MessageList.tsx) 因此疯狂重新渲染；而消息气泡
+  和 [Markdown.tsx](apps/web/src/components/Markdown.tsx)（`react-markdown` 解析）之前都没做
+  `React.memo`，导致**每一个流式片段都要把全部历史消息的 Markdown 重新解析一遍**——消息越多(任务
+  越长)这个 O(消息数) 的开销就越夸张，精准对应"任务很长、context很长才卡"。
+- 根因 2：自动滚动到底部的 `useEffect` 依赖了 `streaming`，AI 说话的每个片段都重新触发一次平滑滚动，
+  滚动动画被不断打断重启，本身就是很典型的卡顿观感。
+- 根因 3：`getSessionDetail()` 没有数量上限，长会话一次性把几百上千条消息全量查出来、连同前端从未
+  用到的 `content` 字段（可能包含很长的工具输出原文）一起传给前端、一次性全部渲染成 DOM。
+- 修复：
+  - `Bubble`/`Markdown` 都包了 `React.memo`——`streaming` 变化时只有正在输出的那一条重新渲染，
+    历史消息不再被反复重新解析。
+  - 自动滚动改成只在"新增一条完整消息"或"开始/结束跑"时触发，并且只在用户本来就在底部附近时才跟随
+    滚动(上翻看历史不会被拉回底部)；改用直接跳转而不是每次都拿"平滑滚动"跟自己打架。
+  - `GET /sessions/:id` 现在只返回最近 200 条消息(`hasMoreMessages` 标记还有没有更早的)；新增
+    `GET /sessions/:id/messages?before=<messageId>` 按游标向前翻页，前端滚动到顶部时按需加载、
+    并且保持滚动位置不跳动。
+  - 消息接口不再返回未使用的 `content` 字段（全仓库确认前端只用 `text` 渲染），减少长会话的传输
+    /解析体积。
+
 ## v0.1.60 — 任务流/代理面板：已完成的折叠，进行中的更醒目
 
 - 左侧任务流：只保留未完成的任务(进行中/待处理/有问题的)常驻显示，进行中的那条自动排到最前面，

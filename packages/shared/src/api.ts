@@ -43,12 +43,21 @@ export interface ListSessionsResponse {
 
 export interface SessionDetailResponse {
   session: SessionDTO;
+  /** Most recent page only (see `hasMoreMessages`); older ones load via `/sessions/:id/messages`. */
   messages: MessageDTO[];
+  /** True when there are older messages beyond this initial page. */
+  hasMoreMessages: boolean;
   plan: PlanTaskDTO[];
   agents: AgentRunDTO[];
   artifacts: ArtifactDTO[];
   attachments: AttachmentDTO[];
   openQuestions: PendingQuestionDTO[];
+}
+
+/** A page of older messages, oldest-to-newest, for infinite-scroll-up. */
+export interface EarlierMessagesResponse {
+  messages: MessageDTO[];
+  hasMore: boolean;
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────────

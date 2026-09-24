@@ -19,7 +19,6 @@ import type {
   ArtifactDTO,
   ArtifactKind,
   AttachmentDTO,
-  ContentBlock,
   EffortLevel,
   Language,
   MemorySummaryDTO,
@@ -77,13 +76,14 @@ export function toSessionDTO(s: Session): SessionDTO {
   };
 }
 
+// Not populated: the client only ever renders `text`, and `content` can carry
+// large tool output — shipping it would just bloat the payload for long sessions.
 export function toMessageDTO(m: Message): MessageDTO {
   return {
     id: m.id,
     sessionId: m.sessionId,
     role: m.role as MessageRole,
     type: m.type,
-    content: (m.content as unknown as ContentBlock[]) ?? [],
     text: m.text,
     tokens: m.tokens,
     agentRunId: m.agentRunId,

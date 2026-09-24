@@ -1,20 +1,24 @@
 'use client';
-import { useEffect, useRef } from 'react';
+import { memo } from 'react';
 import type { MessageDTO } from '@chapi/shared';
 import { cn } from '@/lib/utils';
 import { Markdown } from './Markdown';
 
-function Bubble({
-  role,
-  type,
-  text,
-  streaming,
-}: {
+interface BubbleProps {
   role: string;
   type?: string;
   text: string;
   streaming?: boolean;
-}) {
+}
+
+/**
+ * Memoized so re-renders triggered by unrelated state (in particular the
+ * `streaming` string, which changes on every streamed chunk from the SDK)
+ * don't re-run this for every historical message — that used to mean
+ * re-parsing Markdown for the entire conversation on every streamed
+ * character, which is what made long conversations feel increasingly janky.
+ */
+const Bubble = memo(function Bubble({ role, type, text, streaming }: BubbleProps) {
   const isUser = role === 'user';
   const isQuality = type === 'quality';
   return (
@@ -40,7 +44,7 @@ function Bubble({
       </div>
     </div>
   );
-}
+});
 
 export function MessageList({
   messages,
@@ -51,11 +55,6 @@ export function MessageList({
   streaming: string;
   running: boolean;
 }) {
-  const endRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length, streaming, running]);
-
   return (
     <div className="flex flex-col gap-4">
       {messages.length === 0 && !streaming && (
@@ -72,7 +71,6 @@ export function MessageList({
           <span className="h-2 w-2 animate-pulse rounded-full bg-accent" /> AI 正在工作…
         </div>
       )}
-      <div ref={endRef} />
     </div>
   );
 }

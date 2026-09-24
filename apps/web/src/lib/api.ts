@@ -1,5 +1,6 @@
 import type {
   CreateSessionResponse,
+  EarlierMessagesResponse,
   ListSessionsResponse,
   SessionDetailResponse,
   BrowserLoginResponse,
@@ -47,6 +48,11 @@ export const api = {
 
   sessionBySlug: (slug: string) =>
     req<SessionDetailResponse>(`/sessions/by-slug/${slug}`),
+
+  earlierMessages: (sessionId: string, beforeMessageId: string) =>
+    req<EarlierMessagesResponse>(
+      `/sessions/${sessionId}/messages?before=${encodeURIComponent(beforeMessageId)}`,
+    ),
 
   deleteSession: (id: string) =>
     req<{ ok: true }>(`/sessions/${id}`, { method: 'DELETE' }),

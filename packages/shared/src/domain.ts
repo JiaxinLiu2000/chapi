@@ -141,7 +141,10 @@ export interface MessageDTO {
   role: MessageRole;
   /** SDK message subtype, e.g. "assistant", "result", "tool_result". */
   type: string;
-  content: ContentBlock[];
+  /** Raw content blocks. Omitted from list/history responses — the client only
+   * ever renders `text`, so shipping this (which can carry large tool output)
+   * would just bloat the payload for long sessions with nothing rendering it. */
+  content?: ContentBlock[];
   text: string;
   tokens: number;
   agentRunId: string | null;
