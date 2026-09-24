@@ -1,7 +1,17 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { Brain, ChevronLeft, ChevronRight, Clock, Coins, Cpu, MessageSquare, Wrench } from 'lucide-react';
-import type { AgentRunDTO } from '@chapi/shared';
+import {
+  Brain,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Coins,
+  Cpu,
+  MessageSquare,
+  Wrench,
+} from 'lucide-react';
+import type { AgentRunDTO, PlanTaskDTO } from '@chapi/shared';
 import { useStore } from '@/lib/store';
 import { cn, formatDuration, formatTokens } from '@/lib/utils';
 
@@ -89,6 +99,56 @@ function TagChip({ tag }: { tag: string }) {
     >
       {tag}
     </span>
+  );
+}
+
+const PLAN_DONE_STATUSES = new Set(['done', 'replaced', 'error']);
+const AGENT_DONE_STATUSES = new Set(['done', 'idle', 'interrupted', 'error']);
+
+/**
+ * Collapsed-by-default bar for finished items (完成的任务/代理/质检). Click to expand
+ * a list ordered newest-to-oldest, so what's still active stays visually on top and
+ * clutter-free, and history is one click away instead of scrolled past.
+ */
+function CompletedGroup({ count, children }: { count: number; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  if (count === 0) return null;
+  return (
+    <div className="mt-1.5">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-1 rounded px-1 py-1 text-xs text-muted/70 hover:text-muted"
+      >
+        <ChevronDown size={12} className={cn('transition-transform', !open && '-rotate-90')} />
+        已完成 ({count})
+      </button>
+      {open && <div className="mt-1 space-y-1.5 border-l-2 border-border/60 pl-2">{children}</div>}
+    </div>
+  );
+}
+
+function PlanTaskRow({ t }: { t: PlanTaskDTO }) {
+  const active = t.status === 'in_progress';
+  return (
+    <li
+      className={cn(
+        'flex items-start gap-1.5 rounded-md px-1.5 py-1 text-sm',
+        active && 'border border-accent/30 bg-accent/10 font-medium',
+      )}
+    >
+      <span className="mt-0.5">{PLAN_ICON[t.status] ?? '⬜'}</span>
+      <span
+        className={cn(
+          'leading-snug',
+          t.status === 'done' && 'text-muted',
+          t.status === 'failed' && 'text-danger',
+          t.status === 'problem' && 'text-warn',
+          (t.status === 'replaced' || t.status === 'error') && 'text-muted line-through',
+        )}
+      >
+        {t.text}
+      </span>
+    </li>
   );
 }
 
@@ -207,6 +267,34 @@ export function MonitorCard() {
 
   const done = plan.filter((t) => t.status === 'done').length;
   const currentStage = plan.find((t) => t.status === 'in_progress')?.text ?? null;
+
+  // Active plan tasks stay visible (in-progress bubbled to the top); finished ones
+  // collapse into a "已完成" bar, newest-first when expanded.
+  const activePlanTasks = plan
+    .filter((t) => !PLAN_DONE_STATUSES.has(t.status))
+    .slice()
+    .sort((a, b) => {
+      const rank = (t: PlanTaskDTO) => (t.status === 'in_progress' ? 0 : 1);
+      return rank(a) - rank(b) || a.ordinal - b.ordinal;
+    });
+  const donePlanTasks = plan
+    .filter((t) => PLAN_DONE_STATUSES.has(t.status))
+    .slice()
+    .sort((a, b) => b.ordinal - a.ordinal);
+
+  // Same idea for agents: the main agent always shows; sub-agents/quality-review
+  // runs that are still running/scheduled stay visible, finished ones collapse.
+  const mainAgent = agents.find((a) => a.name === 'main');
+  const otherAgents = agents.filter((a) => a.name !== 'main');
+  const activeAgents = otherAgents.filter((a) => !AGENT_DONE_STATUSES.has(a.status));
+  const doneAgents = otherAgents
+    .filter((a) => AGENT_DONE_STATUSES.has(a.status))
+    .slice()
+    .sort((a, b) => {
+      const at = Date.parse(a.endedAt ?? a.startedAt ?? '') || 0;
+      const bt = Date.parse(b.endedAt ?? b.startedAt ?? '') || 0;
+      return bt - at;
+    });
   // tick while actively running; pause when idle or waiting on the user (HITL)
   const ticking = runState === 'running' && questions.length === 0 && approvals.length === 0;
   const liveMs = useLiveElapsed(usage?.activeMs ?? 0, ticking);
@@ -267,24 +355,20 @@ export function MonitorCard() {
         {plan.length === 0 ? (
           <div className="px-1 text-xs text-muted/60">尚无计划</div>
         ) : (
-          <ul className="space-y-1">
-            {plan.map((t) => (
-              <li key={t.id} className="flex items-start gap-1.5 text-sm">
-                <span className="mt-0.5">{PLAN_ICON[t.status] ?? '⬜'}</span>
-                <span
-                  className={cn(
-                    'leading-snug',
-                    t.status === 'done' && 'text-muted',
-                    t.status === 'failed' && 'text-danger',
-                    t.status === 'problem' && 'text-warn',
-                    (t.status === 'replaced' || t.status === 'error') && 'text-muted line-through',
-                  )}
-                >
-                  {t.text}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="space-y-1">
+              {activePlanTasks.map((t) => (
+                <PlanTaskRow key={t.id} t={t} />
+              ))}
+            </ul>
+            <CompletedGroup count={donePlanTasks.length}>
+              <ul className="space-y-1">
+                {donePlanTasks.map((t) => (
+                  <PlanTaskRow key={t.id} t={t} />
+                ))}
+              </ul>
+            </CompletedGroup>
+          </>
         )}
       </div>
 
@@ -293,10 +377,16 @@ export function MonitorCard() {
         <div className="mt-3">
           <div className="mb-1.5 px-1 text-xs font-semibold text-muted">代理状态</div>
           <div className="space-y-1.5">
-            {agents.map((a) => (
-              <AgentRow key={a.id} a={a} currentStage={a.name === 'main' ? currentStage : null} />
+            {mainAgent && <AgentRow key={mainAgent.id} a={mainAgent} currentStage={currentStage} />}
+            {activeAgents.map((a) => (
+              <AgentRow key={a.id} a={a} />
             ))}
           </div>
+          <CompletedGroup count={doneAgents.length}>
+            {doneAgents.map((a) => (
+              <AgentRow key={a.id} a={a} />
+            ))}
+          </CompletedGroup>
         </div>
       )}
           </div>

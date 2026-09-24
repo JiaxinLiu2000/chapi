@@ -4,6 +4,14 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.60 — 任务流/代理面板：已完成的折叠，进行中的更醒目
+
+- 左侧任务流：只保留未完成的任务(进行中/待处理/有问题的)常驻显示，进行中的那条自动排到最前面，
+  并加了醒目的高亮边框；已完成(含被替换/作废)的任务折叠进一条"已完成 (N)"按钮里，点开按
+  从新到旧(按任务顺序倒序)展示。
+- 代理状态同理：主代理始终显示；运行中/定时的子代理与质检保持可见；已结束的子代理/质检折叠进
+  同款"已完成"栏，点开按结束时间从新到旧排列。
+
 ## v0.1.59 — 修复：一个号打满后，会误判另一个号也到限额了
 
 - 根因:chapi 之前判断"账号是否限额"只看粗糙信号——某条 `assistant` 消息带 `error === 'rate_limit'`，
