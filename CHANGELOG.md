@@ -4,6 +4,20 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.62 — 修复：选了"主号"，消息偶尔还是被发到备用号
+
+- 根因：切换账号(`set.config`)和发消息(`user.message`)是两条独立的 WebSocket 消息。切换账号会把
+  当时还活着的 `Run` 停掉、下一条消息才会用新账号重新起一个——但如果消息紧跟着切换发出、抢在这次
+  "停掉重启"完成之前被处理到，就会命中那个还没来得及销毁的旧 `Run`，而旧 `Run` 是按切换前的账号
+  (比如 `auto`，之前可能已经解析成备用号)起的——于是这条消息就悄悄用旧账号发出去了，即使下拉框
+  已经明明白白选了"主号"。这是一个时序竞争，所以是"有时候"出现，不是每次都发生。
+- 修复：[orchestrator.ts](apps/server/src/engine/orchestrator.ts) 的 `handleUserMessage` 现在会在
+  真正发消息前，比对"当前存活的 Run 实际启动时用的账号"和"数据库里此刻的账号设置"是否一致；
+  只要不一致(说明命中了上面这个竞争窗口)，就先把这个过时的 Run 停掉，让消息走一个按最新账号
+  重新起的新 Run，不会再用旧的。
+- 新增 [orchestrator.test.ts](apps/server/src/engine/orchestrator.test.ts)（2 个用例）覆盖：
+  账号过时时会先销毁重建；账号本就一致时不会做多余的重启。
+
 ## v0.1.61 — 修复：任务/上下文很长时对话框卡顿
 
 - 根因 1(最大来源)：AI 每吐一个字符/片段，`streaming` 状态就变一次，[Chat.tsx](apps/web/src/components/Chat.tsx)

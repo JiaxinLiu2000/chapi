@@ -42,6 +42,20 @@ export class SdkOrchestrator implements Orchestrator {
       return;
     }
 
+    // A message can race a `set.config` account-mode change: both are separate
+    // WebSocket messages, and if the switch's own run-teardown (see `setConfig`)
+    // hasn't finished yet by the time this one is handled, the still-live run
+    // would silently push this turn out on its *old* pin instead of the one the
+    // user just picked. Catch that here too — if the run we'd reuse was started
+    // under a different pin than the session has right now, tear it down first.
+    const currentMode = (session.accountMode as 'auto' | 'primary' | 'fallback') ?? 'auto';
+    const existing = this.runs.get(sessionId);
+    const startedMode = existing?.getStartedAccountMode() ?? null;
+    if (existing && startedMode !== null && startedMode !== currentMode) {
+      await existing.stop().catch(() => undefined);
+      this.runs.delete(sessionId);
+    }
+
     const content: ContentBlock[] = [{ type: 'text', text }];
     await prisma.message.create({
       data: {

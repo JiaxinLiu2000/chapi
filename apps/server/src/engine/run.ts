@@ -98,6 +98,17 @@ export class Run {
     await this.loop;
   }
 
+  /**
+   * The account pin this run actually started with ('auto'/'primary'/'fallback'),
+   * or null if it hasn't started yet. Lets the orchestrator detect a race where a
+   * user message arrives for an existing run whose pin is now stale (e.g. the
+   * user just switched the account dropdown and this message got in ahead of
+   * that config change tearing the old run down) — see `handleUserMessage`.
+   */
+  getStartedAccountMode(): 'auto' | 'primary' | 'fallback' | null {
+    return this.started ? this.accountMode : null;
+  }
+
   private async ensureStarted(): Promise<void> {
     if (this.started) return;
     this.started = true;
