@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useStore } from '@/lib/store';
@@ -38,14 +38,39 @@ export function Chat({ sessionId }: { sessionId: string }) {
     if (el) nearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
   };
 
+  // Whether we've done the initial jump-to-bottom for the *currently open*
+  // session yet. Reset whenever the session changes — Next.js may reuse this
+  // component across `/s/[slug]` navigations rather than remounting it.
+  const didInitialScrollRef = useRef(false);
+  useEffect(() => {
+    didInitialScrollRef.current = false;
+    nearBottomRef.current = true;
+  }, [sessionId]);
+
   // Auto-scroll to the newest content — but only on meaningful transitions
   // (a full message landed, or streaming/running started or ended), not on
   // every individual streamed character/chunk. That would otherwise re-trigger
   // a scroll many times per second on long responses, which is itself a source
   // of visible jank independent of how many past messages there are.
-  useEffect(() => {
+  //
+  // The very first time a session's messages load, jump straight to the
+  // bottom (no animation): scrollTo({behavior:'smooth'}) sweeps scrollTop
+  // through every intermediate value on the way down, including values under
+  // LOAD_EARLIER_THRESHOLD_PX — which would spuriously fire the "load earlier
+  // messages" logic below mid-animation and land the view mid-history instead
+  // of at the latest message. useLayoutEffect (not useEffect) so this happens
+  // before paint — no visible flash of the wrong scroll position.
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (!didInitialScrollRef.current) {
+      if (messages.length === 0) return; // wait for the initial page to actually load
+      el.scrollTop = el.scrollHeight;
+      didInitialScrollRef.current = true;
+      return;
+    }
     if (nearBottomRef.current) {
-      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length, isStreaming, running]);
@@ -73,7 +98,13 @@ export function Chat({ sessionId }: { sessionId: string }) {
 
   const onScroll = () => {
     updateNearBottom();
-    if (scrollRef.current && scrollRef.current.scrollTop < LOAD_EARLIER_THRESHOLD_PX) {
+    // Guard with didInitialScrollRef too: don't treat the initial landing (or
+    // any programmatic jump) as the user scrolling up to browse history.
+    if (
+      didInitialScrollRef.current &&
+      scrollRef.current &&
+      scrollRef.current.scrollTop < LOAD_EARLIER_THRESHOLD_PX
+    ) {
       void loadEarlier();
     }
   };
