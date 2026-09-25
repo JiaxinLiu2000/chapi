@@ -4,6 +4,25 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.64 — 排查并修复：CloakBrowser 经常"启用不成功"
+
+- 实测排查(现场触发启动、翻查进程列表)发现三个叠加的根因，而不是安装/启动本身坏了——手动触发一次
+  `/browser/start` 其实几秒内就能正常跑起来：
+  1. **没有健康检查**:[supervisor.ts](apps/server/src/supervisor.ts) 的 `ensureBrowserRunning()`
+     以前只在服务端启动、或用户手动在设置里切换/点启动时才会调用一次。cloakbrowser 一旦在这之后的
+     任何时刻自己挂了(用户关掉了可见窗口、崩溃、电脑休眠……)，没有任何东西会发现并重启它——
+     一直死到用户自己重新点一下，看起来就是"启用不成功"。现在加了 30 秒一次的后台健康检查，
+     启用状态下发现连不上就自动重新拉起。
+  2. **代理脚本连不上时只会报错，不会喊服务端拉起浏览器**:[chapi_browser.py](tools/browser/chapi_browser.py)
+     以前如果 cloakbrowser 没在跑，直接尝试连接、重试几次就放弃报错。现在改成连接前先探测，连不上就
+     先 `POST /api/browser/start` 喊 chapi 服务端拉起来，再等它就绪(最多约 90 秒，覆盖首次下载内核的
+     情况)，才真正去连接。
+  3. **开发环境下服务端重启会留下"孤儿"cloakbrowser 进程**:Windows 上收不到优雅关闭信号时
+     (比如开发时代码改动触发的自动重启)，旧进程被直接终止，它启动的 cloakbrowser 子进程会变成孤儿
+     继续占着 CDP 端口/浏览器 profile 的独占锁，干扰下一次启动、并且每次重启都会再堆一个——
+     现场翻进程列表时真的发现了三组重叠的孤儿进程。现在每次启动前会先扫一遍、清掉这类孤儿进程
+     (按可执行文件名 + 命令行里的 `serve.py` 精确匹配，不会误伤无关进程)。
+
 ## v0.1.63 — 修复：打开历史对话总是停在很早之前的位置(v0.1.61 引入的回归)
 
 - 根因:v0.1.61 加了"滚动到顶部时自动加载更早消息"，同时保留了原来"新内容用平滑滚动滚到底部"的逻辑。

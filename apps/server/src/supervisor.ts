@@ -23,11 +23,21 @@ const SERVE_SCRIPT = path.resolve(here, '../../../tools/browser/serve.py');
  * takes flags like `--headless=false`; it does NOT take --port/--user-data-dir.
  * We run it headed so the user can log into accounts in the same browser.
  */
+// How often to check that cloakbrowser is still up while it's enabled, and
+// restart it if not. Without this, once the browser dies for any reason (the
+// user closes the visible window, it crashes, the machine sleeps, …) nothing
+// notices — ensureBrowserRunning() previously only ran at server boot or on an
+// explicit user action, so it would just silently stay dead until someone
+// happened to open Settings and re-toggle it, which is what "启用不成功"
+// (looks like it never started, when it actually died sometime after) reports.
+const HEALTH_CHECK_INTERVAL_MS = 30_000;
+
 class Supervisor {
   private procs: ChildProcess[] = [];
   private logs: string[] = [];
   private starting = false;
   private serveProc: ChildProcess | null = null;
+  private healthCheckTimer: ReturnType<typeof setInterval> | null = null;
 
   private pushLog(chunk: string): void {
     const ts = new Date().toISOString().slice(11, 19);
@@ -47,6 +57,9 @@ class Supervisor {
       this.pushLog(`浏览器自动启动检查失败（稍后可在设置重试）: ${err}`);
       log.warn('ensureBrowserRunning failed at startup', err);
     });
+    this.healthCheckTimer = setInterval(() => {
+      void this.ensureBrowserRunning().catch((err) => log.warn('browser health check failed', err));
+    }, HEALTH_CHECK_INTERVAL_MS);
   }
 
   /** Idempotent: ensure cloakserve is installed and listening on the CDP port. */
@@ -85,8 +98,45 @@ class Supervisor {
     await this.ensureBrowserRunning();
   }
 
+  /**
+   * Kill any stray `serve.py` processes left over from a previous server
+   * instance. Windows doesn't deliver our SIGTERM handler's `supervisor.stop()`
+   * reliably on every shutdown path (in particular, a dev-server auto-restart
+   * on file change can terminate the old process before its cleanup runs) —
+   * so a leftover orphan can keep holding the persistent Chromium profile's
+   * singleton lock, silently blocking a fresh launch from starting cleanly
+   * and accumulating across restarts. Clear the slate before every launch.
+   */
+  private killOrphanCloakserve(): void {
+    if (!isWin) return;
+    try {
+      spawnSync(
+        'powershell',
+        [
+          '-NoProfile',
+          '-Command',
+          // Match on the script filename alone — the exec'd grandchild python.exe
+          // (the one actually hosting the browser) only carries `serve.py` in its
+          // own argv, not the `cloakbrowser` package name from the uvx wrapper
+          // that spawned it, so requiring both substrings would miss exactly the
+          // process that matters. Restrict to the actual launcher executable
+          // names too — otherwise this PowerShell invocation's own command line
+          // (which necessarily contains the text "serve.py") matches itself.
+          "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and " +
+            "$_.CommandLine.Contains('serve.py') -and " +
+            "$_.Name -in @('python.exe','uvx.exe','uv.exe') } " +
+            '| ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }',
+        ],
+        { stdio: 'ignore' },
+      );
+    } catch {
+      /* best-effort cleanup — a failure here shouldn't block starting a fresh one */
+    }
+  }
+
   private startCloakserve(hidden: boolean): void {
     if (this.serveProc) return;
+    this.killOrphanCloakserve();
     const port = String(config.cloakbrowserCdpPort);
     this.pushLog(
       `启动持久化 cloakbrowser (${hidden ? 'headless/隐藏' : 'headed/可见'}, CDP 127.0.0.1:${port})`,
@@ -138,6 +188,10 @@ class Supervisor {
   }
 
   stop(): void {
+    if (this.healthCheckTimer) {
+      clearInterval(this.healthCheckTimer);
+      this.healthCheckTimer = null;
+    }
     for (const p of this.procs) {
       try {
         if (isWin && p.pid) spawnSync('taskkill', ['/PID', String(p.pid), '/T', '/F'], { stdio: 'ignore' });

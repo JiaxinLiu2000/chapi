@@ -48,10 +48,13 @@ import random
 import tempfile
 import threading
 import time
+import urllib.request
 from contextlib import asynccontextmanager, contextmanager
 
 # 服务端运行脚本时注入；默认本机 9222。
 CDP_ENDPOINT = os.environ.get("CHAPI_CDP_ENDPOINT", "http://127.0.0.1:9222")
+# chapi 自己的 HTTP API；服务端运行脚本时注入，默认本机 8123。
+SERVER_URL = os.environ.get("CHAPI_SERVER_URL", "http://127.0.0.1:8123")
 
 _NO_CONTEXT_MSG = (
     "cloakbrowser 已连接但没有可用的上下文（contexts 为空）。请确认浏览器已在设置中启用并已就绪；"
@@ -141,8 +144,41 @@ def _hold_lock():
         lk.release()
 
 
+def _cdp_reachable() -> bool:
+    try:
+        urllib.request.urlopen(f"{CDP_ENDPOINT}/json/version", timeout=1.5)
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _ensure_browser_running() -> None:
+    """cloakbrowser 可能在"启用"之后的任意时刻自己挂了（用户关掉了可见的窗口、
+    崩溃、机器休眠……），而这之后没有任何东西会自动发现并重启它——直到某个脚本
+    尝试连接才会发现连不上。这里主动喊一声 chapi 服务端把它拉起来，再等它就绪，
+    而不是直接连接失败。"""
+    if _cdp_reachable():
+        return
+    try:
+        req = urllib.request.Request(
+            f"{SERVER_URL}/api/browser/start",
+            method="POST",
+            data=b"{}",
+            headers={"content-type": "application/json"},
+        )
+        urllib.request.urlopen(req, timeout=5)
+    except Exception:  # noqa: BLE001
+        pass  # 尽力而为；就算这一下没喊通，下面还是会照常重试连接
+    # 首次可能要下载内核（~200MB），给够时间再放弃，让下面的连接重试给出真正的错误。
+    for _ in range(45):
+        if _cdp_reachable():
+            return
+        time.sleep(2.0)
+
+
 def _connect_cdp(pw):
     """connect_over_cdp + 短超时 + 有限重试（默认 180s 太慢）。"""
+    _ensure_browser_running()
     last: Exception | None = None
     for attempt in range(3):
         try:
@@ -461,6 +497,7 @@ async def open_page_async(url: str | None = None, *, wait_until: str = "domconte
     _lk.acquire()
     try:
         async with async_playwright() as pw:
+            _ensure_browser_running()
             browser = await pw.chromium.connect_over_cdp(CDP_ENDPOINT, timeout=_CONNECT_TIMEOUT_MS)
             ctxs = browser.contexts
             if not ctxs:

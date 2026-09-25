@@ -90,6 +90,10 @@ export function buildRunOptions(session: Session, deps: BuildOptionsDeps): Optio
       // CDP endpoint of the running cloakbrowser — used by the chapi_browser.py
       // helper so the agent's scripts attach to the shared stealth browser.
       CHAPI_CDP_ENDPOINT: `http://127.0.0.1:${config.cloakbrowserCdpPort}`,
+      // chapi's own HTTP API — chapi_browser.py calls POST /api/browser/start
+      // here to (re)start cloakbrowser on demand if it isn't reachable, instead
+      // of just failing when it happened to have died since it was last enabled.
+      CHAPI_SERVER_URL: `http://127.0.0.1:${config.serverPort}`,
       // Force UTF-8 for the agent's Python scripts so non-ASCII output (e.g. the
       // "→" arrow, Chinese) doesn't crash on the Windows cp1252 console.
       PYTHONUTF8: '1',
