@@ -87,6 +87,9 @@ export function buildRunOptions(session: Session, deps: BuildOptionsDeps): Optio
       // HITL tools (ask_user/request_approval) can block for minutes while the
       // user responds; keep the SDK MCP stream open well beyond the 60s default.
       CLAUDE_CODE_STREAM_CLOSE_TIMEOUT: '3600000',
+      // MCP server connect timeout (CLI default 30s). A cold Python MCP server like
+      // workspace-mcp can exceed 30s, after which the run never gets its tools.
+      MCP_TIMEOUT: '120000',
       // CDP endpoint of the running cloakbrowser — used by the chapi_browser.py
       // helper so the agent's scripts attach to the shared stealth browser.
       CHAPI_CDP_ENDPOINT: `http://127.0.0.1:${config.cloakbrowserCdpPort}`,

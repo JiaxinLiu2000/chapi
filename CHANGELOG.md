@@ -4,6 +4,19 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.65 — 修复：google_workspace 经常无法使用(不是授权问题)
+
+- 根因(查 Claude Code 的 MCP 连接日志确认):SDK 连接 MCP 服务器默认只等 **30 秒**，超时后这次运行
+  就永远拿不到 `mcp__google_workspace__*` 工具。而 chapi 之前每次运行都用未固定版本的 `uvx workspace-mcp`
+  现场解析，偶尔会**重新解析并重装 ~96 个包**，再加上它 Python 启动本身较重，就超过了 30 秒。
+  日志统计:近 40 次运行里约三分之一超时失败，成功的也要 4–17 秒。代理提示"可能需要重新授权"是误判。
+- 修复:
+  - 启动时把 `workspace-mcp` 以**固定版本 1.30.0** 装成持久 uv 工具，每次运行直接启动装好的可执行文件，
+    不再每次现场解析(实测冷启动约 6 秒、87 个工具全部注册)；没装好时退回固定版本的 `uvx`。
+  - 运行环境设 `MCP_TIMEOUT=120000`，把 MCP 连接超时从 30 秒放宽到 120 秒，留足余量。
+  - 顺带修了一个隐藏问题:启动器设置了 `FORCE_COLOR=1`，导致 `uv tool dir` 输出的路径带颜色转义码、
+    找不到可执行文件；查询时关闭颜色输出。
+
 ## v0.1.64 — 排查并修复：CloakBrowser 经常"启用不成功"
 
 - 实测排查(现场触发启动、翻查进程列表)发现三个叠加的根因，而不是安装/启动本身坏了——手动触发一次

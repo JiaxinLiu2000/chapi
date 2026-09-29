@@ -8,6 +8,7 @@ import { scheduler } from './engine/scheduler.js';
 import { setOrchestrator } from './orchestrator/types.js';
 import { seedWorkspaces } from './services/workspaces.js';
 import { supervisor } from './supervisor.js';
+import { ensureWorkspaceMcpInstalled } from './engine/tools/mcpRegistry.js';
 
 const log = createLogger('server');
 
@@ -16,6 +17,7 @@ async function main(): Promise<void> {
   await waitForDb(); // don't touch the DB until MySQL actually accepts connections
   await seedWorkspaces();
   supervisor.start();
+  ensureWorkspaceMcpInstalled();
 
   // Claude Agent SDK orchestrator drives sessions. Requires ANTHROPIC_API_KEY
   // (env or Settings); without it, runs emit an error event prompting setup.
