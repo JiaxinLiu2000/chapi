@@ -77,6 +77,30 @@ describe('SdkOrchestrator.handleUserMessage — stale account-pin race guard', (
     expect(runs.get(sessionId)).not.toBe(staleRun);
   });
 
+  it('on a 401, restarts on a fresh run once, then reports the dead token instead of looping', async () => {
+    const { bus } = await import('../gateway/bus.js');
+    const seen: string[] = [];
+    const off = bus.on((e) => {
+      if (e.type === 'notification' && 'sessionId' in e && e.sessionId === sessionId) seen.push(e.title);
+    });
+    const orchestrator = new SdkOrchestrator(fakeQueryFn);
+    const runs = (orchestrator as unknown as { runs: Map<string, unknown> }).runs;
+    let staleStops = 0;
+    const staleRun = { stop: async () => { staleStops += 1; }, getStartedAccountMode: () => 'primary' as const };
+    runs.set(sessionId, staleRun);
+
+    await orchestrator.onAuthFailed(sessionId, 'continue please', 'primary');
+    expect(staleStops).toBe(1);
+    expect(runs.get(sessionId)).toBeDefined();
+    expect(runs.get(sessionId)).not.toBe(staleRun); // replayed on a fresh run
+    expect(seen).not.toContain('Claude 登录已失效');
+
+    await orchestrator.onAuthFailed(sessionId, 'continue please', 'primary');
+    expect(seen).toContain('Claude 登录已失效'); // second 401 within the window → report
+    expect(runs.has(sessionId)).toBe(false);
+    off();
+  });
+
   it('does not tear down a run whose pin already matches the session', async () => {
     const orchestrator = new SdkOrchestrator(fakeQueryFn);
     let stopCalls = 0;

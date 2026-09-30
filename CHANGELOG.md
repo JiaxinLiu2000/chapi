@@ -4,6 +4,17 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.66 — 修复：长时间运行的会话报 401 "OAuth access token has expired"，回复"继续"也一直失败
+
+- 根因(查数据库 + 日志确认):出错的是 apartments.com 会话里一个**已经连续跑了 20 小时**的 run 进程
+  (09-29 23:17 用主号启动)。同一个主号 token 用新进程调用完全正常，只有这个长寿进程开始返回 401。
+  而 chapi 之前碰到 `authentication_failed` 只会把错误原样当回复显示，不会重启进程——所以每次"继续"
+  都打到同一个失效的进程上，永远失败。
+- 修复:碰到 401 时自动停掉旧进程、换一个新进程(照样接着同一段对话)重放这条消息；如果新进程 5 分钟内
+  还是 401，才说明 token 本身真的失效了，这时弹出明确提示是哪个账号、并告诉用户用 `claude setup-token`
+  重新生成——不会无限重启。
+- 新增单元测试覆盖"首次 401 自动重启"和"再次 401 改为提示、不再重启"。
+
 ## v0.1.65 — 修复：google_workspace 经常无法使用(不是授权问题)
 
 - 根因(查 Claude Code 的 MCP 连接日志确认):SDK 连接 MCP 服务器默认只等 **30 秒**，超时后这次运行

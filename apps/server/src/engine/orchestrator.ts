@@ -260,6 +260,32 @@ export class SdkOrchestrator implements Orchestrator {
     }
   }
 
+  // When each session last got an auth-failure restart, so a token that is
+  // genuinely dead gets reported instead of restarted in a loop.
+  private authRetryAt = new Map<string, number>();
+
+  async onAuthFailed(sessionId: string, lastUserText: string, account: string): Promise<void> {
+    const old = this.runs.get(sessionId);
+    await old?.stop().catch(() => undefined);
+    this.runs.delete(sessionId);
+
+    const recentlyRetried = Date.now() - (this.authRetryAt.get(sessionId) ?? 0) < 5 * 60_000;
+    if (!recentlyRetried && lastUserText.trim()) {
+      // First 401: usually just the long-lived process's session going stale —
+      // a fresh process (resuming the same conversation) with the same token works.
+      this.authRetryAt.set(sessionId, Date.now());
+      await this.getRun(sessionId).pushUserMessage(lastUserText);
+      return;
+    }
+
+    // A fresh process failed too → the stored token itself is no longer valid.
+    const who = account === 'primary' ? '主账号' : account === 'fallback' ? '备用账号' : '本机 Claude 登录';
+    const body = `${who}的登录凭证已失效(换新进程重试后仍返回 401)。请在终端运行 claude setup-token 重新生成长期 token，粘贴到 设置 → Claude 账号 后再继续。`;
+    bus.emit({ type: 'notification', sessionId, level: 'error', title: 'Claude 登录已失效', body });
+    bus.emit({ type: 'error', sessionId, message: body });
+    bus.emit({ type: 'run.state', sessionId, state: 'idle' });
+  }
+
   async setConfig(
     sessionId: string,
     model?: string,

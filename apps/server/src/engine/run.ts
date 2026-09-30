@@ -296,6 +296,17 @@ export class Run {
       await this.onRateLimit();
       return;
     }
+    // A long-lived run process can start returning 401 "OAuth access token has
+    // expired" even though the same stored token still works from a fresh
+    // process. Hand off to the orchestrator to restart on a new process and
+    // replay the turn instead of printing the error on every "继续".
+    if (m.error === 'authentication_failed') {
+      if (this.failingOver) return;
+      this.failingOver = true;
+      log.warn(`session ${this.sessionId}: ${this.account} Claude auth failed — restarting run`);
+      void getOrchestrator().onAuthFailed(this.sessionId, this.lastUserText, this.account);
+      return;
+    }
 
     // Each assistant message = one Claude Code model response (main agent OR a
     // background sub-agent). Count it live so "Claude 调用" grows as work happens

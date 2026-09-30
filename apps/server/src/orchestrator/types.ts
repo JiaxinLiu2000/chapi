@@ -51,6 +51,9 @@ export interface Orchestrator {
    * seat (soonest to recover if both are limited) and replay the turn.
    */
   onRateLimit(sessionId: string, lastUserText: string, account: 'primary' | 'fallback'): Promise<void>;
+
+  /** A run got a 401 from Claude — restart it on a fresh process once, else report the dead token. */
+  onAuthFailed(sessionId: string, lastUserText: string, account: string): Promise<void>;
 }
 
 let active: Orchestrator | null = null;
