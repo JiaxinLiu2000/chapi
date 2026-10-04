@@ -15,6 +15,39 @@ import { scheduler } from './scheduler.js';
 
 const log = createLogger('engine:orchestrator');
 
+const RECAP_MAX_CHARS = 12_000;
+const RECAP_MSG_CHARS = 600;
+
+/**
+ * Recent transcript from chapi's own DB (newest last, capped), excluding the
+ * just-sent user message — used to re-seed context when the SDK's own
+ * transcript for `resume` has been cleaned up.
+ */
+async function buildRecap(sessionId: string, lastUserText: string): Promise<string> {
+  const rows = await prisma.message.findMany({
+    where: { sessionId, role: { in: ['user', 'assistant'] } },
+    orderBy: { createdAt: 'desc' },
+    take: 60,
+    select: { role: true, text: true },
+  });
+  const lines: string[] = [];
+  let total = 0;
+  let skippedLatest = false;
+  for (const m of rows) {
+    const text = m.text.trim();
+    if (!text) continue;
+    if (!skippedLatest && m.role === 'user' && text === lastUserText.trim()) {
+      skippedLatest = true; // it's replayed separately as the latest message
+      continue;
+    }
+    const line = `${m.role === 'user' ? '用户' : 'AI'}：${text.length > RECAP_MSG_CHARS ? `${text.slice(0, RECAP_MSG_CHARS)}…` : text}`;
+    if (total + line.length > RECAP_MAX_CHARS) break;
+    lines.push(line);
+    total += line.length;
+  }
+  return lines.reverse().join('\n\n');
+}
+
 /** Manages one Run per active session and implements the gateway Orchestrator. */
 export class SdkOrchestrator implements Orchestrator {
   private runs = new Map<string, Run>();
@@ -284,6 +317,24 @@ export class SdkOrchestrator implements Orchestrator {
     bus.emit({ type: 'notification', sessionId, level: 'error', title: 'Claude 登录已失效', body });
     bus.emit({ type: 'error', sessionId, message: body });
     bus.emit({ type: 'run.state', sessionId, state: 'idle' });
+  }
+
+  async onResumeLost(sessionId: string, lastUserText: string): Promise<void> {
+    const old = this.runs.get(sessionId);
+    await old?.stop().catch(() => undefined);
+    this.runs.delete(sessionId);
+    // Drop the dead SDK session id so the next run starts a new conversation.
+    await prisma.session.update({ where: { id: sessionId }, data: { sdkSessionId: null } });
+
+    if (!lastUserText.trim()) {
+      bus.emit({ type: 'run.state', sessionId, state: 'idle' });
+      return;
+    }
+    const recap = await buildRecap(sessionId, lastUserText);
+    const prompt = recap
+      ? `[系统说明：本会话此前的 Claude 会话记录已过期被清理，无法直接续接。以下是 chapi 自己保存的本会话最近对话摘录，请据此接上上下文继续工作，不必向用户提及此说明。]\n\n${recap}\n\n[用户最新消息]\n${lastUserText}`
+      : lastUserText;
+    await this.getRun(sessionId).pushUserMessage(prompt);
   }
 
   async setConfig(

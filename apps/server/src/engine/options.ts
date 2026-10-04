@@ -79,6 +79,10 @@ export function buildRunOptions(session: Session, deps: BuildOptionsDeps): Optio
     includePartialMessages: true,
     agentProgressSummaries: true,
     settingSources: [],
+    // Keep transcripts so `resume` keeps working for long-lived sessions (the CLI
+    // default deletes them after 30 days). Other Claude Code processes sharing
+    // ~/.claude can still sweep them — onResumeLost covers that case.
+    settings: { cleanupPeriodDays: 3650 },
     mcpServers: deps.mcpServers ?? {},
     abortController: deps.abortController,
     ...(session.sdkSessionId ? { resume: session.sdkSessionId } : {}),

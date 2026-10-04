@@ -101,6 +101,33 @@ describe('SdkOrchestrator.handleUserMessage — stale account-pin race guard', (
     off();
   });
 
+  it('when the resume transcript is gone, drops the SDK session id and replays with chapi history', async () => {
+    await prisma.session.update({ where: { id: sessionId }, data: { sdkSessionId: 'dead-transcript-id' } });
+    await prisma.message.createMany({
+      data: [
+        { sessionId, role: 'user', type: 'user', content: [], text: 'research horror games' },
+        { sessionId, role: 'assistant', type: 'assistant', content: [], text: 'Found 40 titles so far' },
+        { sessionId, role: 'user', type: 'user', content: [], text: '继续' },
+      ],
+    });
+    const orchestrator = new SdkOrchestrator(fakeQueryFn);
+    const runs = (orchestrator as unknown as { runs: Map<string, unknown> }).runs;
+    let stops = 0;
+    runs.set(sessionId, { stop: async () => { stops += 1; }, getStartedAccountMode: () => 'primary' as const });
+
+    await orchestrator.onResumeLost(sessionId, '继续');
+
+    expect(stops).toBe(1);
+    const s = await prisma.session.findUnique({ where: { id: sessionId } });
+    // cleared, or replaced by the fresh run's own new SDK session id — never the dead one
+    expect(s?.sdkSessionId).not.toBe('dead-transcript-id');
+    const fresh = runs.get(sessionId) as { lastUserText?: string } | undefined;
+    expect(fresh).toBeDefined();
+    const replayed = (fresh as unknown as { lastUserText: string }).lastUserText;
+    expect(replayed).toContain('Found 40 titles so far'); // history re-seeded
+    expect(replayed.trim().endsWith('继续')).toBe(true); // latest message replayed last
+  });
+
   it('does not tear down a run whose pin already matches the session', async () => {
     const orchestrator = new SdkOrchestrator(fakeQueryFn);
     let stopCalls = 0;

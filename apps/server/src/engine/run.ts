@@ -184,6 +184,12 @@ export class Run {
       // so don't alarm the user with an error toast.
       if (this.abort.signal.aborted || isAbortError(err)) {
         log.debug('run loop stopped (aborted)');
+      } else if (/No conversation found with session ID/i.test(err instanceof Error ? err.message : String(err))) {
+        // The SDK transcript we tried to `resume` is gone — Claude Code deletes
+        // transcripts older than cleanupPeriodDays (default 30). Start a fresh
+        // conversation seeded from chapi's own copy of the history instead.
+        log.warn(`session ${this.sessionId}: resume transcript missing — restarting fresh from chapi history`);
+        void getOrchestrator().onResumeLost(this.sessionId, this.lastUserText);
       } else {
         log.error('run loop error', err);
         bus.emit({

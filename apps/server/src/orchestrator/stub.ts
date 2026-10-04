@@ -107,6 +107,10 @@ export class StubOrchestrator implements Orchestrator {
     // no-op for the stub
   }
 
+  async onResumeLost(): Promise<void> {
+    // no-op for the stub
+  }
+
   async markCompleted(sessionId: string): Promise<void> {
     await setSessionStatus(sessionId, 'completed');
     bus.emit({

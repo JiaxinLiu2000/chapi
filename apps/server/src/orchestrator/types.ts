@@ -54,6 +54,9 @@ export interface Orchestrator {
 
   /** A run got a 401 from Claude — restart it on a fresh process once, else report the dead token. */
   onAuthFailed(sessionId: string, lastUserText: string, account: string): Promise<void>;
+
+  /** The SDK transcript to resume no longer exists — restart fresh, seeded with chapi's history. */
+  onResumeLost(sessionId: string, lastUserText: string): Promise<void>;
 }
 
 let active: Orchestrator | null = null;
