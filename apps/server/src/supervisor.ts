@@ -31,6 +31,9 @@ const SERVE_SCRIPT = path.resolve(here, '../../../tools/browser/serve.py');
 // happened to open Settings and re-toggle it, which is what "启用不成功"
 // (looks like it never started, when it actually died sometime after) reports.
 const HEALTH_CHECK_INTERVAL_MS = 30_000;
+// How long a freshly-spawned cloakserve gets to start serving CDP before the
+// health check treats it as stuck.
+const SERVE_STARTUP_GRACE_MS = 90_000;
 
 class Supervisor {
   private procs: ChildProcess[] = [];
@@ -38,6 +41,17 @@ class Supervisor {
   private starting = false;
   private serveProc: ChildProcess | null = null;
   private healthCheckTimer: ReturnType<typeof setInterval> | null = null;
+  private serveStartedAt = 0;
+  private installedOnce = false;
+
+  private killProc(p: ChildProcess): void {
+    try {
+      if (isWin && p.pid) spawnSync('taskkill', ['/PID', String(p.pid), '/T', '/F'], { stdio: 'ignore' });
+      else p.kill();
+    } catch {
+      /* already gone */
+    }
+  }
 
   private pushLog(chunk: string): void {
     const ts = new Date().toISOString().slice(11, 19);
@@ -67,6 +81,24 @@ class Supervisor {
     if (!(await settings.getBrowserEnabled())) return;
     if (this.starting) return;
     if (await cloakserveReachable()) return;
+
+    // A launcher process that's alive but not serving: still starting, or its
+    // browser died underneath it. Give a fresh launch time to come up; after
+    // that, kill it — otherwise startCloakserve() sees serveProc and never relaunches.
+    if (this.serveProc) {
+      if (Date.now() - this.serveStartedAt < SERVE_STARTUP_GRACE_MS) return;
+      log.warn('cloakserve process alive but CDP unreachable — killing it to relaunch');
+      this.pushLog('cloakbrowser 进程还在但浏览器没响应，重启它…');
+      this.killProc(this.serveProc);
+      this.serveProc = null;
+    }
+
+    const hidden = await settings.getBrowserHidden();
+    if (this.installedOnce) {
+      this.startCloakserve(hidden); // kernel already checked this server run
+      return;
+    }
+
     this.starting = true;
     this.pushLog('启用 cloakbrowser：检查内核并启动 cloakserve（首次会下载内核 ~200MB）…');
     log.info('ensuring cloakbrowser / cloakserve');
@@ -82,9 +114,9 @@ class Supervisor {
       this.pushLog(`install 失败: ${e}. 请确认已安装 uv (https://docs.astral.sh/uv/).`);
       this.starting = false;
     });
-    const hidden = await settings.getBrowserHidden();
     install.on('exit', (code) => {
       this.pushLog(`内核检查/安装完成 (code ${code})，启动 cloakbrowser…`);
+      if (code === 0) this.installedOnce = true;
       this.startCloakserve(hidden);
       this.starting = false;
     });
@@ -159,9 +191,12 @@ class Supervisor {
     child.on('error', (e) => this.pushLog(`cloakserve 启动失败: ${e}`));
     child.on('exit', (code) => {
       this.pushLog(`cloakserve 退出 (code ${code})`);
-      this.serveProc = null;
+      log.warn(`cloakserve exited (code ${code})`);
+      // A killed predecessor's late exit must not clear the replacement.
+      if (this.serveProc === child) this.serveProc = null;
     });
     this.serveProc = child;
+    this.serveStartedAt = Date.now();
     this.procs.push(child);
   }
 

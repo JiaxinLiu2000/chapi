@@ -118,10 +118,28 @@ except Exception:  # noqa: BLE001
 
 print(f"[cloakserve] ready: CDP on 127.0.0.1:{port}", flush=True)
 
-# Stay alive until the process is killed by the supervisor.
+# Stay alive while the browser is. If the window is closed or Chromium crashes,
+# EXIT — otherwise this process lingers with no browser behind it and the
+# supervisor (which only restarts when this process is gone) never relaunches.
+import urllib.request
+
+
+def _cdp_up() -> bool:
+    try:
+        urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=3)
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+misses = 0
 try:
     while True:
-        time.sleep(3600)
+        time.sleep(5)
+        misses = 0 if _cdp_up() else misses + 1
+        if misses >= 3:
+            print("[cloakserve] browser is gone (CDP unreachable) — exiting so it can be restarted", flush=True)
+            break
 except KeyboardInterrupt:
     pass
 finally:
