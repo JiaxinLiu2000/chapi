@@ -1,6 +1,6 @@
 {
   "name": "@chapi/server",
-  "version": "0.1.66",
+  "version": "0.1.73",
   "private": true,
   "type": "module",
   "scripts": {
@@ -14,7 +14,7 @@
     "prisma:push": "prisma db push"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.3.175",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.296",
     "@anthropic-ai/sdk": "^0.104.1",
     "@chapi/shared": "workspace:*",
     "@fastify/cors": "^10.0.2",
@@ -22,16 +22,19 @@
     "@lancedb/lancedb": "^0.30.0",
     "@prisma/client": "^6.2.1",
     "chrome-remote-interface": "^0.33.3",
+    "discord.js": "14.27.0",
     "dotenv": "^16.4.7",
     "fastify": "^5.2.1",
     "nanoid": "^5.0.9",
     "openai": "^6.42.0",
+    "qrcode": "1.5.4",
     "ws": "^8.18.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/chrome-remote-interface": "^0.31.14",
     "@types/node": "^22.10.5",
+    "@types/qrcode": "1.5.5",
     "@types/ws": "^8.5.13",
     "prisma": "^6.2.1",
     "tsx": "^4.19.2",

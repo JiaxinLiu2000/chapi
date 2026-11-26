@@ -1,8 +1,8 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowUp, Paperclip, Sparkles } from 'lucide-react';
+import { ArrowRight, ArrowUp, Paperclip } from 'lucide-react';
 import { api } from '@/lib/api';
 import { AttachmentTray } from '@/components/AttachmentTray';
 import { ConfigSelectors, type RunConfig } from '@/components/ConfigSelectors';
@@ -21,16 +21,22 @@ export default function HomePage() {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const draft = useAttachmentDraft();
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  // Focus the prompt on desktop only — on phones it would pop the keyboard over the page.
+  useEffect(() => {
+    if (window.matchMedia('(pointer: fine)').matches) inputRef.current?.focus();
+  }, []);
 
   const { data: settingsData } = useQuery({ queryKey: ['settings'], queryFn: api.getSettings });
   const st = settingsData?.settings;
   const [cfg, setCfg] = useState<RunConfig>({
     model: '',
     subagentModel: '',
-    effort: 'max',
+    effort: 'high',
     language: 'zh',
     accountMode: 'auto',
-    qualityReviewMinutes: 0,
+    qualityReviewMinutes: 5,
+    qualityModel: '',
   });
   // Seed the model dropdowns from the configured defaults once settings load.
   useEffect(() => {
@@ -55,6 +61,7 @@ export default function HomePage() {
         language: cfg.language,
         accountMode: cfg.accountMode,
         qualityReviewMinutes: cfg.qualityReviewMinutes,
+        qualityModel: cfg.qualityModel || undefined,
       });
 
       let uploaded;
@@ -87,22 +94,19 @@ export default function HomePage() {
   const canSend = !busy && (text.trim().length > 0 || draft.items.length > 0);
 
   return (
-    <main className="mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-2xl flex-col items-center justify-center px-4">
+    <main id="main" tabIndex={-1} className="mx-auto flex outline-none min-h-[calc(100dvh-3.5rem)] max-w-2xl flex-col items-center justify-center px-4 py-10">
       <div className="mb-8 text-center">
-        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-border bg-panel px-3 py-1 text-xs text-muted">
-          <Sparkles size={14} className="text-accent" /> 用自然语言驱动 Claude Code
-        </div>
-        <h1 className="text-2xl font-semibold">你想完成什么任务？</h1>
-        <p className="mt-2 text-sm text-muted">
-          描述任务，AI 会规划、调用工具、派发子代理，并把结果交给你审批。
+        <h1 className="text-[22px] font-medium leading-tight sm:text-[26px]">你想完成什么任务？</h1>
+        <p className="mx-auto mt-3 max-w-md text-balance text-sm leading-relaxed text-muted [word-break:keep-all]">
+          描述任务，Claude Code 会规划、调用工具、派发子代理，最后把成果交给你审批
         </p>
       </div>
 
       <div
         {...draft.dropProps}
         className={cn(
-          'relative w-full rounded-2xl border bg-panel p-2 shadow-xl transition',
-          draft.dragActive ? 'border-accent ring-2 ring-accent/30' : 'border-border',
+          'relative w-full rounded-2xl border bg-panel p-2 transition-colors duration-150 ease-ui',
+          draft.dragActive ? 'border-accent ring-2 ring-accent/30' : 'border-border focus-within:border-accent',
         )}
       >
         {draft.dragActive && (
@@ -114,7 +118,7 @@ export default function HomePage() {
         <AttachmentTray items={draft.items} onRemove={draft.remove} disabled={busy} />
 
         <textarea
-          autoFocus
+          ref={inputRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onPaste={draft.onPaste}
@@ -125,17 +129,19 @@ export default function HomePage() {
             }
           }}
           rows={3}
-          placeholder="例如：在网上查找最新的行业报告并总结成文档…（可拖入或粘贴文件、截图）"
-          className="max-h-60 w-full resize-none bg-transparent px-3 py-2 text-[15px] outline-none placeholder:text-muted/60"
+          aria-label="描述你的任务"
+          placeholder="例如：在网上查找最新的行业报告并总结成文档…"
+          className="max-h-60 w-full resize-none bg-transparent px-3 py-2 text-[14px] leading-relaxed outline-none placeholder:text-muted max-sm:text-base"
         />
         <div className="flex items-center justify-between p-1">
           <button
             onClick={draft.openPicker}
             disabled={busy}
-            className="rounded-lg p-2 text-muted transition hover:bg-panel2 hover:text-text disabled:opacity-50"
-            title="添加文件/图片"
+            className="btn btn--ghost btn--icon"
+            title="添加文件或图片（也可拖入、粘贴）"
+            aria-label="添加文件或图片"
           >
-            <Paperclip size={18} />
+            <Paperclip size={18} aria-hidden />
           </button>
           <input
             ref={draft.inputRef}
@@ -145,19 +151,35 @@ export default function HomePage() {
             onChange={draft.onInputChange}
           />
           <div className="flex items-center gap-2">
-            {busy && draft.uploading && <span className="text-xs text-muted">上传中…</span>}
+            {busy && draft.uploading && (
+              <span className="text-xs text-muted" role="status">
+                上传中…
+              </span>
+            )}
             <button
               onClick={() => void start(text)}
               disabled={!canSend}
-              className="grid h-9 w-9 place-items-center rounded-xl bg-accent text-white transition hover:brightness-110 disabled:opacity-40"
+              className="btn btn--primary btn--icon"
+              aria-label="开始任务"
+              title="开始任务（Enter）"
             >
-              <ArrowUp size={18} />
+              <ArrowUp size={18} aria-hidden />
             </button>
           </div>
         </div>
       </div>
 
-      <div className="mt-3 flex w-full flex-wrap items-center justify-center gap-2">
+      {/* phones: labelled grid; sm+: one centred row */}
+      <div className="mt-4 grid w-full grid-cols-2 gap-3 sm:hidden">
+        <ConfigSelectors
+          value={cfg}
+          settings={st}
+          disabled={busy}
+          onChange={(partial) => setCfg((c) => ({ ...c, ...partial }))}
+          stack
+        />
+      </div>
+      <div className="mt-4 hidden w-full flex-wrap items-center justify-center gap-x-4 gap-y-2 sm:flex">
         <ConfigSelectors
           value={cfg}
           settings={st}
@@ -166,17 +188,25 @@ export default function HomePage() {
         />
       </div>
 
-      <div className="mt-6 flex w-full flex-col gap-2">
-        {EXAMPLES.map((ex) => (
-          <button
-            key={ex}
-            onClick={() => void start(ex)}
-            disabled={busy}
-            className="rounded-lg border border-border bg-panel px-3 py-2 text-left text-sm text-muted transition hover:border-accent hover:text-text"
-          >
-            {ex}
-          </button>
-        ))}
+      <div className="mt-8 w-full">
+        <div className="label mb-2 px-1">试试这些</div>
+        <div className="flex flex-col gap-2">
+          {EXAMPLES.map((ex) => (
+            <button
+              key={ex}
+              onClick={() => void start(ex)}
+              disabled={busy}
+              className="group flex items-center gap-3 rounded-xl border border-border bg-panel px-4 py-3 text-left text-sm text-muted transition-[color,background-color,border-color,transform] duration-150 ease-ui hover:border-text/25 hover:text-text active:scale-[0.99] disabled:opacity-50"
+            >
+              <span className="min-w-0 flex-1 text-pretty">{ex}</span>
+              <ArrowRight
+                size={16}
+                aria-hidden
+                className="text-muted opacity-0 transition-[opacity,transform] duration-150 group-hover:translate-x-0.5 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
+              />
+            </button>
+          ))}
+        </div>
       </div>
     </main>
   );

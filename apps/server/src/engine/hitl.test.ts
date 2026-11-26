@@ -30,3 +30,31 @@ describe('chapi tool server', () => {
     expect(server.type).toBe('sdk');
   });
 });
+
+describe('hitl wait tracking', () => {
+  it('marks a session waiting while a question/approval is open', async () => {
+    const seen: Array<[string, boolean]> = [];
+    const off = hitl.onWaitChange((sid, w) => seen.push([sid, w]));
+    const q = hitl.waitForQuestion('wq-1', 's-wait');
+    expect(hitl.isWaiting('s-wait')).toBe(true);
+    const a = hitl.waitForApproval('wa-1', 's-wait');
+    hitl.resolveQuestion('wq-1', 'x');
+    expect(hitl.isWaiting('s-wait')).toBe(true); // approval still open
+    hitl.resolveApproval('wa-1', { decision: 'approve' });
+    expect(hitl.isWaiting('s-wait')).toBe(false);
+    await Promise.all([q, a]);
+    expect(seen).toEqual([
+      ['s-wait', true],
+      ['s-wait', false],
+    ]);
+    off();
+  });
+
+  it('forgets waits when the turn ends (interrupted tool calls never pin the session)', async () => {
+    const { bus } = await import('../gateway/bus.js');
+    void hitl.waitForApproval('wa-2', 's-int');
+    expect(hitl.isWaiting('s-int')).toBe(true);
+    bus.emit({ type: 'run.state', sessionId: 's-int', state: 'idle' });
+    expect(hitl.isWaiting('s-int')).toBe(false);
+  });
+});

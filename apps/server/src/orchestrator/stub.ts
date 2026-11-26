@@ -95,6 +95,14 @@ export class StubOrchestrator implements Orchestrator {
     // no-op for the stub
   }
 
+  async injectAdvice(): Promise<void> {
+    // no-op for the stub
+  }
+
+  async runQualityReview(): Promise<void> {
+    // no-op for the stub
+  }
+
   isActive(): boolean {
     return false;
   }

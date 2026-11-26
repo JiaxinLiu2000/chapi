@@ -132,10 +132,26 @@ def _cdp_up() -> bool:
         return False
 
 
+def _idle(seconds: float) -> None:
+    """Wait WITHOUT starving Playwright's dispatcher.
+
+    Playwright auto-attaches to every new target with waitForDebuggerOnStart, and
+    the sync API only processes protocol messages while one of its calls is
+    running. A plain time.sleep() therefore leaves every popup opened by a page
+    (window.open — e.g. "Sign in with Google") paused forever as a blank window.
+    Blocking inside a Playwright wait keeps the dispatcher pumping, so popups are
+    resumed immediately.
+    """
+    try:
+        ctx.wait_for_event("page", timeout=seconds * 1000)
+    except Exception:  # noqa: BLE001 — timeout (normal) or browser gone (CDP check handles it)
+        time.sleep(0.2)
+
+
 misses = 0
 try:
     while True:
-        time.sleep(5)
+        _idle(5)
         misses = 0 if _cdp_up() else misses + 1
         if misses >= 3:
             print("[cloakserve] browser is gone (CDP unreachable) — exiting so it can be restarted", flush=True)

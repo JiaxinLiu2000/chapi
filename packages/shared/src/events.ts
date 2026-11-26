@@ -19,6 +19,7 @@ import type {
   ToolCallDTO,
   UsageDTO,
 } from './domain.js';
+import type { WorkflowRunDTO } from './workflow.js';
 
 export const WS_PATH = '/ws';
 
@@ -36,6 +37,8 @@ export type ServerEvent =
       text: string;
     }
   | { type: 'assistant.message'; sessionId: string; message: MessageDTO }
+  /** A user message was stored (any origin). The web adds its own optimistically and ignores this; remote chats mirror it. */
+  | { type: 'user.message'; sessionId: string; message: MessageDTO }
   | { type: 'tool.started'; sessionId: string; toolCall: ToolCallDTO }
   | {
       type: 'tool.updated';
@@ -53,6 +56,8 @@ export type ServerEvent =
       outputPreview?: string;
     }
   | { type: 'plan.updated'; sessionId: string; tasks: PlanTaskDTO[] }
+  | { type: 'workflow.run.updated'; sessionId: string; run: WorkflowRunDTO }
+  | { type: 'board.changed' }
   | { type: 'agent.status'; sessionId: string; agent: AgentRunDTO }
   | { type: 'usage.updated'; sessionId: string; usage: UsageDTO }
   | { type: 'question.open'; sessionId: string; question: PendingQuestionDTO }
@@ -149,7 +154,13 @@ export const clientCommandSchema = z.discriminatedUnion('type', [
     language: z.enum(['zh', 'en']).optional(),
     accountMode: z.enum(['auto', 'primary', 'fallback']).optional(),
     qualityReviewMinutes: z.number().int().min(0).max(120).optional(),
+    /** Quality-advisor model ("" = follow the sub-agent model). */
+    qualityModel: z.string().optional(),
+    /** Allow this session to use the user's own logged-in Chrome (default off → cloakbrowser only). */
+    userChrome: z.boolean().optional(),
   }),
+  /** Run the quality advisor right now. */
+  z.object({ type: z.literal('quality.run'), sessionId: z.string().min(1) }),
   z.object({ type: z.literal('ping') }),
 ]);
 

@@ -25,7 +25,7 @@ export async function complete(opts: {
   model?: string;
   accountMode?: 'auto' | 'primary' | 'fallback';
   sessionId?: string; // when set, this call is logged to the usage ledger
-  trigger?: 'summarize' | 'consolidate';
+  trigger?: 'summarize' | 'consolidate' | 'title' | 'learning' | 'remote';
 }): Promise<string> {
   const key = await settings.getAnthropicKey();
   const acct = await chooseActiveAccount(opts.accountMode);

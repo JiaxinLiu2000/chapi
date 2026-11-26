@@ -41,7 +41,15 @@ export interface Orchestrator {
     language?: string,
     accountMode?: string,
     qualityReviewMinutes?: number,
+    qualityModel?: string,
+    userChrome?: boolean,
   ): Promise<void>;
+
+  /** Quality advisor feedback straight into the session's run (not shown as a user message). */
+  injectAdvice(sessionId: string, text: string): Promise<void>;
+
+  /** Run a quality review now (manual trigger from the monitor). */
+  runQualityReview(sessionId: string): Promise<void>;
 
   /** True if a run is currently active for this session. */
   isActive(sessionId: string): boolean;

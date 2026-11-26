@@ -4,6 +4,172 @@ Version is the single source of truth in `packages/shared/src/version.ts` (`APP_
 shown at the bottom of the web UI. **Convention: bump the PATCH (third) digit on every
 code update, and use the same `vX.Y.Z` in the commit message.**
 
+## v0.1.73 — 公式渲染（KaTeX）、学习材料技能
+
+- **公式渲染**：聊天消息、知识点详情/编辑预览统一用 `remark-math` + `rehype-katex`（KaTeX）渲染 LaTeX：行内 `$...$`、
+  独立 `$$...$$`，模型常用的 `\(...\)` / `\[...\]` 自动转换（`apps/web/src/lib/math.ts`）。单 `$` 按 pandoc 规则配对，
+  **金额不会被误当公式**（`$2,500 到 $3,000`、`$1.2M and $800K`、`$2,500-$3,000` 照常显示）；代码块/行内代码不处理；
+  写错或流式输出到一半的公式只显示为红色源码，不会让整条消息出错。长公式横向滚动。
+- **系统提示**：新增「回复中的数学公式」规范（LaTeX、不放代码块、不用 Unicode 上下标、先公式后逐个解释符号与维度、给数值例子），
+  学习类任务先读技能 `study-materials`。
+- **新技能 `workspaces/skills/study-materials/`**：讲解 / cheatsheet / 翻面卡 / 复习讲义 / 练习题的流程与验收清单，并收录 CS6140、
+  CS5100 两次已验证的脚本（离线 KaTeX 翻面卡、Word 原生公式 OMML、Google Docs 用 MathJax 把矩阵等转图、写作/公式/术语规范）。
+
+## v0.1.72 — 知识点内容分类、图谱按分类聚拢/筛选、负面偏好全红、默认配置、清理过时的 Google Workspace 知识
+
+- **内容分类**（`WikiEntry.topics`，Obsidian 属性 `categories`）：每个知识点 1~3 个内容分类（哪个网站 / 项目 / 客户 / 工具 /
+  领域，第一个为主分类），优先于节点类型。学习代理每次生成知识点都必须分类（拿到已有分类列表，优先复用、确实没有才新建）；
+  `wiki_write` 必填 `categories`；编辑器可填（带已有分类联想）；`wiki_read()` 目录与 `知识库目录.md` 先按分类、再按类型组织；
+  检索时同分类的知识点加分。分类与普通标签使用**各自独立**的同义缓存（分类保留原写法，如「Tower II 租金竞品」「apartments.com」）。
+  已给现有知识点分好类（37 个分类）。
+- **知识图谱**：先按主分类分区（分类名标在簇上方），类型在分类内再细分；跨分类链接只保留连线、几乎不拉扯。左侧可点选分类
+  「只看这些」（可多选）、按标签筛选、按类型隐藏、只看负面偏好；筛选后自动缩放到可见范围。**负面偏好整个节点为红色**
+  （Obsidian 图谱同样用 `[polarity:negative]` 着红色）。
+- **学习代理修复**：①查找"已有相关知识点"改为按每个事件的关键内容单独检索（之前用整段上下文检索，长文本把相关度稀释到阈值
+  以下，导致没识别出偏好冲突、新建了一条相反的偏好）；关键词相关度按最多 20 个词归一化。②提示词要求与已有偏好相反（哪怕只说
+  "这次"）一律判为冲突，并问清"只这一次还是以后都这样"。③技能冲突的修复助手加 6 分钟上限、最多 16 轮。
+  实测：偏好冲突会直接问用户，回答后改写偏好并保持原权重 70；技能冲突在约 1.5 分钟内查到并在沙盘验证了替代方案、更新了该技能。
+- **默认配置**：新会话默认 主代理 Opus 5.5、子代理 Sonnet 5.5、思考强度「高」、中文、质检每 5 分钟（主页默认值 + 设置 +
+  数据库列默认值 + `config.ts` 兜底）。
+- **清理知识库**：之前连不上 Google Workspace 是代码问题（已修复），删除当时为排查/绕开它学到的 17 个知识点（接入不可用时改交
+  Excel、MCP 工具时有时无要重启、授权≠连接、核对启动参数、--single-user / extended 档、两处启动配置、chapi 与 chachapi、
+  Apps Script 跨项目调用、网页建草稿兜底等），并清理了其它知识点里指向它们的链接与来源。保留正常用法（Sheets 写入方式、
+  Apps Script API 开启、只建草稿规则、DNS 抖动处置）。清理前备份 `data/backups/wiki-2026-10-20-before-gws-prune.json`。
+  新脚本 `scripts/prune-wiki.ts`（按标题删除并清理链接）、`scripts/set-categories.ts`（批量设分类）。
+- **提交审批规则修正**：任务流里"提交审批 / 交付"这一步本身不再阻止 `request_approval`（它只能靠提交来完成），审批通过后自动标为
+  完成。端到端实测（真实 Sonnet 5.5 会话，脚本扮演用户）发现首次提交被这一步误拦。同一次实测中：主代理按规则建任务流、逐步更新，
+  中途纠正与"要求修改"都被学习代理记成了偏好（测试产生的知识点已删除）。
+- 新脚本 `scripts/reindex-wiki.ts`：OpenAI 充值后重建全部向量（先检测嵌入可用，否则直接报错不动数据）。
+
+## v0.1.71 — 学习代理 + 原子知识点（技能/偏好/数据）+ 严格任务流 + 知识图谱读取/编辑
+
+- **知识点分三类**（`WikiEntry.kind/score/polarity/situation/solution/observedAt/history`）：
+  技能（权重 0-100、工具标签）、偏好（权重、场景标签、正面/负面）、数据（置信度 0-100、来源（每个带日期/可靠度/
+  单源置信度）、数据时间）。每个知识点有「情况/前提」「方案」两段。Obsidian 里按 `entries/技能|偏好|数据/` 分文件夹，
+  属性里写权重/置信度；把笔记拖到别的文件夹即改变类型。检索时先按相关度过滤，再按权重/置信度从高到低排。
+- **标签同义缓存**（`knowledge/tags.ts`、新表 `WikiTag`）：所有标签经过规范化（大小写、空格/下划线、`#`、全角、复数 s）
+  映射到同一个规范标签，新写法记为别名；学习代理会拿到已有标签列表并被要求复用。
+- **学习代理**（`learning/learner.ts`，监控栏「学习」，设置里可选模型）。触发：任务步骤 完成 / 遇到问题 / 失败 / 受阻 /
+  换方案后新方案成功或失败（学习该步骤期间的对话和工具调用，正面或负面导向）；用户的每条消息（新对话首条除外，
+  判断是补充还是纠正）；用户回答提问、审批通过/修改/驳回；归档。事件 3–8 秒内合并成一批，按会话串行处理，不阻塞主代理。
+  规则（服务端确定性执行）：相同技能/偏好 → 权重 +1；同一数据、新来源 → 合并来源并重算叠加置信度；同来源同数据 →
+  跳过；不同数据 → 两条都保留并互相链接；**偏好矛盾** → 学习代理直接向用户提问（不经过、不打断主代理），回答后按回答
+  改写该偏好并继承原权重，结果在主代理工作中则立即送达、否则下一轮附上；出错则保留旧知识点；**技能矛盾** → 独立查找
+  替代方案（WebSearch/WebFetch，可在沙盘里验证），解决则更新该知识点并通知主代理，否则权重 −1。
+- **严格的任务流**（`engine/plan.ts`）：新工具 `update_plan_step`（单步更新；problem/failed/blocked/replaced 必须写
+  reason；换方案用 `replacement` 插入并关联新步骤）；`set_plan` 按文本保留已有步骤的状态和计时，不再整表删了重建。
+  新增 `PlanTask.reason/replacesId/startedAt/endedAt/learnedStatus`，左侧面板显示原因。强制手段：还有 pending/进行中
+  步骤时 `request_approval` 拒绝；连续 15 次工具调用没更新任务流会提醒；结束一轮时仍有进行中步骤会提醒一次；
+  禁用 `TodoWrite`。质检把步骤标为问题时也走这里（原因写入、会触发学习）。
+- **读取记忆**（仿企业用 Obsidian：动手前先查）：用户每条消息后附上相关知识点（首条为"规划前先看"）；`set_plan`
+  返回附上与这些步骤相关的经验；`update_plan_step` 报问题/失败/受阻/换方案时附上可参考的技能和偏好；首次使用某类工具
+  （Google Sheets/Docs/Gmail、cloakbrowser 脚本、Excel、HTTP 抓取、邮箱验证、PDF）前通过 hook 注入相关技能；
+  子代理启动时注入与其任务相关的知识点。`wiki_search` 可按类型过滤，`wiki_read` 显示来源、变更历史、双链。
+- 新增统一的主代理收件箱（`engine/inbox.ts`）：质检顾问的建议与学习代理的知识更新都走这里（主代理在工作就立即送达，否则下一轮附上）。
+- **设置 → 模型**：主代理、子代理（新会话默认）、质检顾问、学习代理（后两者默认跟随子代理）。会话顶栏去掉了"质检模型"。
+- **前端**：知识图谱按类型分区聚拢、节点大小 = 权重/置信度、同类节点被权重高的节点吸引、不同类型互相排斥、负面偏好红圈；
+  图谱页和列表页都可以搜索、新增、编辑、删除知识点（新组件 `KnowledgeEditor`，数据类按来源自动算置信度）；
+  学习代理的偏好确认问题在提问区单独标出"不会打断主代理"。接口：`POST/PUT/DELETE /api/wiki/entries`、`GET /api/wiki/tags`。
+- **旧 Wiki 全部重整为原子知识点**：47 条长笔记 → 275 个知识点（技能 167、偏好 55、数据 53；跨组重复的 Rent Type 偏好已合并），
+  冲突按"较新、经用户确认的规则胜出，旧规则写进备注"处理，数据冲突两条都保留；原始创建日期保留。整理前备份
+  `data/backups/wiki-2026-10-20-47-before-atomic.json`，拆分方案 `data/backups/atomic-A|B|C.json`（`scripts/atomize-wiki.ts` 可复用）。
+- 归档时的旧"复盘学习"（`learning/consolidate.ts`）由学习代理取代。
+- 新增测试 `learner.test.ts`；`vault.test.ts` 改为带类型的知识点。实测：步骤"换方案并成功"学到 1 条技能，用户一句纠正被拆成 2 条偏好。
+
+## v0.1.70 — 反爬分级侦察、Google 拟人搜索 + 置信度、审批留痕、质检顾问、Obsidian 知识库与知识图谱
+
+- **爬虫先侦察再选策略**（新工具 `site_recon`，`tools/siteRecon.ts`）：纯 HTTP 探测 + 响应头/cookie/挑战页识别
+  （Cloudflare / Akamai / DataDome / PerimeterX / Kasada / Imperva / AWS WAF / 验证码 / 限流头 / robots.txt
+  Crawl-delay / 已知强站点），给出 L0–L3 等级和对应做法：L0 直接调 API/纯 HTTP、4–8 并发不加延时；L1 HTTP +
+  浏览器请求头、0.5–1.5s；L2 cloakbrowser 可直接进深层 URL、1–3s；L3 才用完整拟人协议。同时提示数据入口
+  （`__NEXT_DATA__`、JSON-LD、`/wp-json/`、`/api/…`、URL 本身是 JSON）。按域名缓存 7 天（`data/site-profiles.json`），
+  被拦截时 `report="blocked"` 升一级（30 天内有效）。厂商脚本也会注入正常页面，所以只有页面被拦或几乎没内容时才算"挑战"。
+  系统提示、`web-research` / `batch-scripting` 技能按等级重写（不再对所有网站一律用最保守的方式）。
+- **联网搜索 = cloakbrowser 里的 Google 拟人搜索，每个关键词至少 2 页**：`chapi_browser.google_search(page, q, pages=2)`
+  / `google_search_many` / 命令行 `python chapi_browser.py google "q" --pages 2 --json out.json`。打开 Google → 逐字输入
+  → 滚动 → 点"下一页"（或 More results），返回标题/链接/摘要/摘要日期；遇人机验证抛 `GoogleCaptcha`。内置 WebSearch 降为补充。
+- **置信度**（新工具 `rate_sources`，`tools/confidence.ts`）：单来源 `c = R × (0.5 + 0.5F)`，可靠度 R 官方 0.95 / 权威
+  0.80 / 聚合平台 0.65 / 社区 0.40 / 未知 0.30；新鲜度 `F = 0.5^(天数/半衰期)`（fast 90 天、medium 365、slow 1825，无日期 0.5）；
+  多个独立来源（同域名只算一次）指向同一数值时叠加 `C = 1 − (1−c₁)·Π(1−0.8cᵢ)`，矛盾来源 `×(1 − 0.5·C矛盾)`；
+  ≥85% 高、≥60% 中。系统提示要求每个关键数据 ≥3 个独立来源，交付时标注置信度和来源。
+- **审批/提问留痕**：审批的成果摘要（含交付物）、我的决定和修改意见，以及 AI 提问（含选项、选中的项）与回答，都写进
+  对话历史（新消息类型 `approval` / `approval_reply` / `question` / `answer`，可被历史搜索命中）。已回填历史上
+  175 次审批、43 次提问（`scripts/backfill-hitl-transcript.ts`，可重复运行）。审批意见和回答输入框改为多行
+  （Enter 换行、Ctrl+Enter 提交），审批摘要按 Markdown 渲染。
+- **质检改为独立的质检顾问**（仿 oh-my-pi advisor，`engine/quality.ts` 重写）：自己的模型和上下文；只看上次质检以来的
+  对话 + 每次工具调用一张卡片（失败只取第一行错误）+ 任务流 + 交付物，用只读工具核实后最多提 3 条 nit/concern/blocker；
+  blocker 立即打断主代理，concern 主代理忙时即时反馈、空闲时留到下一轮，nit 随下一轮附带；刚打断过的 2 轮内 concern 降级；
+  没有新进展就跳过（省 token）；不重复已提过的建议。
+  - **修复：页面上改质检周期不实时生效**。根因：①旧定时器在质检进行中被重新设置时，旧回调结束后又用旧周期重新挂上，
+    新旧两个周期同时在跑、关闭也关不干净；②主代理调用 `schedule_quality_review` / `cancel_quality_review` 会覆盖用户
+    在页面选的周期，且页面不显示；③服务重启后要等下一条消息才恢复。现在：周期改动立即生效（下次 = 上次质检 + 新周期，
+    已过期则 15 秒后），监控里的「质检」卡片显示倒计时和「立即质检」按钮；主代理只能在用户未设置时开启，不能修改或关闭
+    （`cancel_quality_review` 已移除）；服务启动时自动恢复。
+  - 顶栏新增 **质检模型** 下拉（默认跟随子代理，`Session.qualityModel`，下一轮即生效）。
+- **AI Wiki → Obsidian 知识库 + 知识图谱**：`workspaces/ai-wiki/` 即 Obsidian vault，条目为
+  `entries/<分类>/<标题>.md`（属性含 id/aliases/tags/sources/日期），用 `[[双链]]` 互相引用；自动生成 `知识库目录.md`
+  和 `.obsidian` 配置（图谱按分类着色）。双向同步：chapi 写入即导出文件；在 Obsidian 里改/移动/新建/删除笔记，
+  文件监听 1.5 秒后同步回数据库和检索索引（整个文件夹丢失时不会误删，改为重新导出）。新页面 **`/wiki/graph` 知识图谱**
+  （力导向画布：按分类聚类着色、拖拽/平移/缩放、搜索高亮、点节点看全文与链接/反向链接、一键在 Obsidian 打开）；
+  `/wiki` 列表按分类分组、双链可点击。工具：`wiki_write` 增加 `category`/`links`（并按相似度自动补"相关"链接），
+  新增 `wiki_read`（全文 + 链接 + 反向链接；不带参数 = 目录）。
+  - **旧数据已整理**：59 条 → 47 条（合并 10 组重复/重叠条目，冲突说法保留并注明哪个更新），分为 9 个分类，
+    152 条链接、无孤立节点。整理前备份在 `data/backups/wiki-2026-10-20-before-obsidian.json`，整理方案在同目录。
+  - **发现：OpenAI 账户已无额度（429 no credits）**，向量检索一直失败。`wiki_search` 现在失败时自动退回关键词检索
+    （中文按双字切分），不再返回空。
+- Wiki 条目新增列 `category` / `aliases` / `relPath` / `fileHash`，会话新增 `qualityModel`（已 db push）。
+- 新增测试：`quality.test.ts`（7）、`confidence.test.ts`（含反爬分类器，11）、`vault.test.ts`（5）。
+
+## v0.1.69 — 历史记录：全文搜索对话内容 + AI 标题 + 可改名
+
+- **搜索对话内容**：历史面板的搜索框除了匹配标题，还会搜所有用户消息和 AI 的可见回复（不含 thinking、工具调用、
+  质检）。命中的会话显示「N 条消息匹配」和最近 2 条命中片段（关键词高亮、去掉 Markdown 符号）。点片段会打开会话、
+  自动往前翻页找到那条消息，滚到关键词所在位置并高亮。新接口 `GET /api/sessions/search?q=`，直接对
+  `Message.text` 做 `LIKE`（utf8mb4_unicode_ci，大小写不敏感、中文可用），2.5 万条消息约 30ms。
+- **AI 标题**：会话第 1 轮和第 3 轮用户消息后，用子代理模型把对话概括成一行标题（新文件 `learning/title.ts`）。
+  长度按显示宽度控制（汉字算 2、字母算 1，上限 36，约 18 个汉字），保证在历史面板里一行放下、不被截断；
+  模型写超了就把标题发回去让它缩短重写（最多 2 次），硬截断只作最后兜底且不加省略号。
+  已给现有 52 个会话补齐 AI 标题。用量记录里这类调用的 trigger 为 `title`。
+- **改名**：历史面板每行悬停出现铅笔按钮，回车保存、Esc 取消。用户改过的标题 AI 不会再覆盖；清空后保存则交还给
+  AI 重新生成。新接口 `PATCH /api/sessions/:id { title }`。
+- 新增 `Session.titleSource` 列（`auto` 首条消息占位 / `ai` / `user`，已 db push）。写标题用原生 SQL，不刷新
+  `updatedAt`，所以改名、补标题都不会打乱历史列表的时间顺序。
+- 新增 `title.test.ts`（6 个用例）覆盖宽度计算、标题清洗与超长兜底。
+
+## v0.1.68 — 模型下拉加入全部可用模型(含 Opus 5.5)
+
+- `MODEL_OPTIONS` 扩充为 12 个,按强弱排序:Fable 5.1 / Fable 5 / Opus 5.5 / Opus 5 / Opus 4.8 / 4.7 / 4.6 /
+  Sonnet 5.5 / Sonnet 5 / Sonnet 4.6 / Haiku 5.5 / Haiku 4.5。标签「最强/强/均衡/最快」移到各档最新型号上。
+  主页、会话顶栏的主代理/子代理下拉,以及设置里「主/备账号可用模型」勾选项都同步出现新模型。
+- 服务端 `ALL_MODEL_IDS` 改为直接取自 `MODEL_OPTIONS`,以后加模型只需改一处。
+- 数据库里已保存的 `claude_models_primary/fallback` 是旧的 4 个模型,会把新模型过滤掉;已把新模型 ID 追加进去
+  (默认全勾选)。某个账号没有某型号权限的话,在设置里取消勾选即可——账号切换/限额切换时 `topAllowedModel`
+  会选勾选里最强的那个。
+- **升级 Agent SDK 0.3.175 → 0.3.296**(自带 Claude Code 2.1.175 → 2.1.296)。Claude 5 系列要求 Claude Code
+  ≥ 2.1.280,旧版本会报 400 "does not support this model"。
+- 旧的主/备 token(9 月生成、非 `sk-ant-oat01-` 格式)在 2.1.280+ 上一律 401 Invalid bearer token,
+  已用新版 `claude setup-token` 重新生成并在设置里保存。实测两个账号 × 12 个模型在 2.1.296 上全部可用。
+
+## v0.1.67 — 新功能：邮箱验证技能（AfterShip email-verifier）
+
+- 新增 `verify_email` 代理工具：不发信判断邮箱是否真实存在（语法 → MX → SMTP 握手，含 catch-all 探测
+  → 一次性/角色/免费邮箱检测 → 域名拼写纠错），每行返回 `safe / risky / invalid / unknown` 及原因；
+  `saveTo` 可把完整原始 JSON 写进沙盘。批量脚本可直接调 `POST /api/email-verify`（每次 ≤200 个，并发固定为 3，
+  避免 IP 被邮件服务器拉黑）。
+- 核心是 [AfterShip/email-verifier](https://github.com/AfterShip/email-verifier)（Go 库）。上游只自带一个
+  参考 API 服务（不开 SMTP、监听所有网卡、不能配代理），不适合直接用；chapi 新增了
+  `tools/email-verifier`（约 100 行 Go 包装程序，固定库版本），首次使用时用本机 Go 编译到 `data/bin/`，
+  源码变了按 hash 自动重编。每批调用起一次进程（stdin 进 JSON、stdout 出 JSON）——没有常驻服务、端口、
+  Docker 依赖。需要安装 Go（`winget install GoLang.Go`；`setup.mjs` 会提示）。
+- **设置 → 邮箱验证**：勾选启用（启用即后台预编译），可选 SOCKS5 代理 + MAIL FROM / HELO，可直接输入邮箱试验证。
+- 实测本机**出站 25 端口被 ISP 封锁**：不配代理时 SMTP 步骤连不上、结果多为 `unknown`（语法/MX/一次性/
+  角色/免费邮箱/拼写纠错仍有效）；设置页和工具返回都会明确提示这一点。
+- 结果映射的几个细节：AfterShip 遇到一次性域名/语法错误会提前返回、不查 MX，此时 `mxAcceptsMail` 记为
+  `null`（未检查）而不是"无 MX"；SMTP 出错时 deliverable/catch-all 等字段是零值而非结论，一律记为 `null`；
+  catch-all 探测会在问真实地址之前就短路返回，所以 catch-all 统一记为 `risky`；可投递但是角色邮箱也记为 `risky`。
+- 新增技能文档 `workspaces/skills/email-verify/SKILL.md`（含结果解读：`unknown` ≠ 无效）；
+  新增 `emailVerify.test.ts`（13 个用例）覆盖结果映射和代理 URI 拼接。
+
 ## v0.1.66 — 修复：长时间运行的会话报 401 "OAuth access token has expired"，回复"继续"也一直失败
 
 - 根因(查数据库 + 日志确认):出错的是 apartments.com 会话里一个**已经连续跑了 20 小时**的 run 进程

@@ -19,6 +19,7 @@ See the full design at `~/.claude/plans/` (the approved plan) and `docs/` for mo
 - Node ≥ 20, pnpm ≥ 9
 - Docker (for MySQL) **or** a local MySQL 8
 - `uv` (for the Python tool sidecars: PyMuPDF/pypdf, cloakbrowser, google_workspace_mcp)
+- Optional: Go ≥ 1.25 (only for email verification — chapi builds `tools/email-verifier` on first use)
 - An Anthropic API key (engine) and OpenAI API key (RAG embeddings)
 
 ## Quick start

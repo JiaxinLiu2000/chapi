@@ -13,6 +13,7 @@ import type {
   SessionDTO,
   ToolCallDTO,
   UsageDTO,
+  WorkflowRunDTO,
 } from '@chapi/shared';
 
 export interface ToastNotification {
@@ -51,6 +52,8 @@ interface ChapiState {
   hasMoreMessages: boolean;
   streaming: string;
   plan: PlanTaskDTO[];
+  /** Workflow runs of the active session (oldest first), kept live by `workflow.run.updated`. */
+  workflowRuns: WorkflowRunDTO[];
   agents: AgentRunDTO[];
   toolCalls: ToolCallDTO[];
   artifacts: ArtifactDTO[];
@@ -64,6 +67,11 @@ interface ChapiState {
   browserPages: BrowserPaneState[]; // up to 2 live panes
   browserPageCount: number; // 1 or 2
   browserViewOn: boolean;
+  /** Right-hand workflow canvas: open?, which run to focus, which stage's detail is shown. */
+  workflowPanel: { open: boolean; runId: string | null; nodeId: string | null };
+  /** Monitor (plan/agents) as a drawer on screens without the sidebar. */
+  monitorOpen: boolean;
+  setMonitorOpen: (on: boolean) => void;
 
   setSessions: (s: SessionDTO[]) => void;
   loadDetail: (d: SessionDetailResponse) => void;
@@ -71,6 +79,9 @@ interface ChapiState {
   prependMessages: (msgs: MessageDTO[], hasMore: boolean) => void;
   resetActive: () => void;
   setBrowserViewOn: (on: boolean) => void;
+  openWorkflowPanel: (runId?: string | null, nodeId?: string | null) => void;
+  closeWorkflowPanel: () => void;
+  selectWorkflowNode: (runId: string | null, nodeId: string | null) => void;
   clearToast: () => void;
   addOptimisticUser: (text: string) => void;
   applyEvent: (e: ServerEvent) => void;
@@ -92,6 +103,7 @@ export const useStore = create<ChapiState>((set, get) => ({
   hasMoreMessages: false,
   streaming: '',
   plan: [],
+  workflowRuns: [],
   agents: [],
   toolCalls: [],
   artifacts: [],
@@ -103,9 +115,15 @@ export const useStore = create<ChapiState>((set, get) => ({
   browserPages: idlePanes(),
   browserPageCount: 1,
   browserViewOn: false,
+  workflowPanel: { open: false, runId: null, nodeId: null },
 
   setSessions: (s) => set({ sessions: s }),
   setBrowserViewOn: (on) => set({ browserViewOn: on }),
+  openWorkflowPanel: (runId = null, nodeId = null) => set({ workflowPanel: { open: true, runId, nodeId } }),
+  closeWorkflowPanel: () => set((s) => ({ workflowPanel: { ...s.workflowPanel, open: false, nodeId: null } })),
+  selectWorkflowNode: (runId, nodeId) => set((s) => ({ workflowPanel: { ...s.workflowPanel, open: true, runId: runId ?? s.workflowPanel.runId, nodeId } })),
+  monitorOpen: false,
+  setMonitorOpen: (on) => set({ monitorOpen: on }),
 
   loadDetail: (d) =>
     set({
@@ -115,16 +133,20 @@ export const useStore = create<ChapiState>((set, get) => ({
       hasMoreMessages: d.hasMoreMessages,
       streaming: '',
       plan: d.plan,
+      workflowRuns: d.workflowRuns ?? [],
       agents: d.agents,
       artifacts: d.artifacts,
       usage: d.session.usage,
       questions: d.openQuestions,
-      approvals: [],
-      runState: 'idle',
+      approvals: d.openApprovals ?? [],
+      // From the server: a reload (or a refetch on window focus) mid-run must keep
+      // showing the stop button — `run.state` only arrives on transitions.
+      runState: d.runState ?? 'idle',
       toolCalls: [],
       browserPages: idlePanes(),
       browserPageCount: 1,
       browserViewOn: false,
+      workflowPanel: { open: false, runId: null, nodeId: null },
     }),
 
   resetActive: () =>
@@ -135,6 +157,7 @@ export const useStore = create<ChapiState>((set, get) => ({
       hasMoreMessages: false,
       streaming: '',
       plan: [],
+      workflowRuns: [],
       agents: [],
       toolCalls: [],
       artifacts: [],
@@ -145,6 +168,7 @@ export const useStore = create<ChapiState>((set, get) => ({
       browserPages: idlePanes(),
       browserPageCount: 1,
       browserViewOn: false,
+      workflowPanel: { open: false, runId: null, nodeId: null },
     }),
 
   prependMessages: (msgs, hasMore) =>
@@ -197,6 +221,14 @@ export const useStore = create<ChapiState>((set, get) => ({
         break;
       case 'plan.updated':
         if (forActive(e.sessionId)) set({ plan: e.tasks });
+        break;
+      case 'workflow.run.updated':
+        if (forActive(e.sessionId))
+          set((s) => ({
+            workflowRuns: s.workflowRuns.some((r) => r.id === e.run.id)
+              ? s.workflowRuns.map((r) => (r.id === e.run.id ? e.run : r))
+              : [...s.workflowRuns, e.run],
+          }));
         break;
       case 'agent.status':
         if (forActive(e.sessionId)) set((s) => ({ agents: upsertById(s.agents, e.agent) }));

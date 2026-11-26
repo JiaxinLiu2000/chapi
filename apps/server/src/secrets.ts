@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import type { PublicSettingsDTO, UpdateSettingsInput } from '@chapi/shared';
+import { MODEL_OPTIONS, type PublicSettingsDTO, type UpdateSettingsInput } from '@chapi/shared';
 import { config } from './config.js';
 import { prisma } from './db/client.js';
 import { createLogger } from './logger.js';
@@ -14,6 +14,8 @@ const KEY_GOOGLE_EMAIL = 'google_user_email';
 const KEY_GOOGLE_CONNECTED = 'google_connected';
 const KEY_MAIN_MODEL = 'main_model';
 const KEY_SUBAGENT_MODEL = 'subagent_model';
+const KEY_QUALITY_MODEL = 'quality_model';
+const KEY_LEARNING_MODEL = 'learning_model';
 const KEY_EMBEDDING_MODEL = 'embedding_model';
 const KEY_CANVA_ENABLED = 'canva_enabled';
 const KEY_BROWSER_ENABLED = 'browser_enabled';
@@ -33,21 +35,38 @@ const KEY_CLAUDE_FALLBACK_RESET_AT = 'claude_fallback_reset_at';
 const KEY_CLAUDE_COOLDOWN_H = 'claude_cooldown_h';
 const KEY_CLAUDE_MODELS_PRIMARY = 'claude_models_primary'; // comma-separated model IDs
 const KEY_CLAUDE_MODELS_FALLBACK = 'claude_models_fallback';
+// Email verification (AfterShip email-verifier) + optional SOCKS5 proxy for SMTP.
+const KEY_EMAIL_VERIFY_ENABLED = 'email_verify_enabled';
+const KEY_EMAIL_PROXY_HOST = 'email_verify_proxy_host';
+const KEY_EMAIL_PROXY_PORT = 'email_verify_proxy_port';
+const KEY_EMAIL_PROXY_USERNAME = 'email_verify_proxy_username';
+const KEY_EMAIL_PROXY_PASSWORD = 'email_verify_proxy_password';
+const KEY_EMAIL_FROM_EMAIL = 'email_verify_from_email';
+const KEY_EMAIL_HELLO_NAME = 'email_verify_hello_name';
 
-const ALL_MODEL_IDS = [
-  'claude-fable-5',
-  'claude-opus-4-8',
-  'claude-sonnet-4-6',
-  'claude-haiku-4-5-20251001',
-];
+const KEY_DISCORD_TOKEN = 'discord_bot_token';
+const KEY_DISCORD_CHANNEL = 'discord_channel_id';
+const KEY_DISCORD_PREFS = 'discord_prefs';
+
+export interface DiscordPrefs {
+  /** Board automation runs (cron or "run now" on the computer) get a Discord thread by themselves. */
+  autoAutomations: boolean;
+  /** Manual-mode automations ping the channel when their slot comes (with a ▶ button). */
+  remindManual: boolean;
+}
+const DEFAULT_DISCORD_PREFS: DiscordPrefs = { autoAutomations: true, remindManual: true };
+
+const ALL_MODEL_IDS = MODEL_OPTIONS.map((m) => m.id);
 
 const SECRET_KEYS = new Set([
+  KEY_DISCORD_TOKEN,
   KEY_OPENAI,
   KEY_ANTHROPIC,
   KEY_GOOGLE_ID,
   KEY_GOOGLE_SECRET,
   KEY_CLAUDE_TOKEN_PRIMARY,
   KEY_CLAUDE_TOKEN_FALLBACK,
+  KEY_EMAIL_PROXY_PASSWORD,
 ]);
 
 /** Derive a stable 32-byte key from the configured secret (any format). */
@@ -141,11 +160,15 @@ class SettingsStore {
     await this.write(KEY_GOOGLE_CONNECTED, String(value));
   }
 
-  async getModels(): Promise<{ main: string; subagent: string; embedding: string }> {
+  async getModels(): Promise<{ main: string; subagent: string; embedding: string; quality: string; learning: string }> {
+    const subagent = (await this.readRaw(KEY_SUBAGENT_MODEL)) || config.subagentModel;
     return {
       main: (await this.readRaw(KEY_MAIN_MODEL)) || config.mainModel,
-      subagent: (await this.readRaw(KEY_SUBAGENT_MODEL)) || config.subagentModel,
+      subagent,
       embedding: (await this.readRaw(KEY_EMBEDDING_MODEL)) || config.embeddingModel,
+      // "" = follow the sub-agent model
+      quality: (await this.readRaw(KEY_QUALITY_MODEL)) || subagent,
+      learning: (await this.readRaw(KEY_LEARNING_MODEL)) || subagent,
     };
   }
 
@@ -233,12 +256,74 @@ class SettingsStore {
     };
   }
 
+  /** Discord remote: bot token (secret) + the channel threads are created in. */
+  async getDiscord(): Promise<{ token?: string; channelId?: string }> {
+    return {
+      token: (await this.readRaw(KEY_DISCORD_TOKEN)) || undefined,
+      channelId: (await this.readRaw(KEY_DISCORD_CHANNEL)) || undefined,
+    };
+  }
+
+  async setDiscord(input: { token?: string | null; channelId?: string | null }): Promise<void> {
+    // Clearing deletes the row: an encrypted empty string doesn't decrypt back to ''.
+    const put = async (key: string, v: string | null | undefined) => {
+      if (v === undefined) return;
+      if (v) await this.write(key, v);
+      else await prisma.setting.deleteMany({ where: { key } });
+    };
+    await put(KEY_DISCORD_TOKEN, input.token);
+    await put(KEY_DISCORD_CHANNEL, input.channelId);
+  }
+
+  async getDiscordPrefs(): Promise<DiscordPrefs> {
+    const raw = await this.readRaw(KEY_DISCORD_PREFS);
+    if (!raw) return { ...DEFAULT_DISCORD_PREFS };
+    try {
+      const v = JSON.parse(raw) as Partial<DiscordPrefs>;
+      return {
+        autoAutomations: typeof v.autoAutomations === 'boolean' ? v.autoAutomations : DEFAULT_DISCORD_PREFS.autoAutomations,
+        remindManual: typeof v.remindManual === 'boolean' ? v.remindManual : DEFAULT_DISCORD_PREFS.remindManual,
+      };
+    } catch {
+      return { ...DEFAULT_DISCORD_PREFS };
+    }
+  }
+
+  async setDiscordPrefs(patch: Partial<DiscordPrefs>): Promise<DiscordPrefs> {
+    const next = { ...(await this.getDiscordPrefs()), ...patch };
+    await this.write(KEY_DISCORD_PREFS, JSON.stringify(next));
+    return next;
+  }
+
+  async getEmailVerifyEnabled(): Promise<boolean> {
+    return (await this.readRaw(KEY_EMAIL_VERIFY_ENABLED)) === 'true';
+  }
+
+  /** SMTP options for the verifier; `proxy` is set only when a SOCKS5 host+port are configured. */
+  async getEmailVerifyConfig(): Promise<{
+    proxy?: { host: string; port: number; username?: string; password?: string };
+    fromEmail: string;
+    helloName: string;
+  }> {
+    const host = ((await this.readRaw(KEY_EMAIL_PROXY_HOST)) || '').trim();
+    const port = Number.parseInt((await this.readRaw(KEY_EMAIL_PROXY_PORT)) || '', 10);
+    const username = (await this.readRaw(KEY_EMAIL_PROXY_USERNAME)) || undefined;
+    const password = (await this.readRaw(KEY_EMAIL_PROXY_PASSWORD)) || undefined;
+    return {
+      ...(host && Number.isFinite(port) ? { proxy: { host, port, username, password } } : {}),
+      fromEmail: (await this.readRaw(KEY_EMAIL_FROM_EMAIL)) || '',
+      helloName: (await this.readRaw(KEY_EMAIL_HELLO_NAME)) || '',
+    };
+  }
+
   async getPublic(): Promise<PublicSettingsDTO> {
     const models = await this.getModels();
     const google = await this.getGoogleOAuth();
     return {
       mainModel: models.main,
       subagentModel: models.subagent,
+      qualityModel: (await this.readRaw(KEY_QUALITY_MODEL)) || '',
+      learningModel: (await this.readRaw(KEY_LEARNING_MODEL)) || '',
       embeddingModel: models.embedding,
       hasOpenAiKey: Boolean(await this.getOpenAiKey()),
       hasAnthropicKey: Boolean(await this.getAnthropicKey()),
@@ -259,6 +344,14 @@ class SettingsStore {
       claudeCooldownH: (await this.getClaudeFailover()).cooldownH,
       claudeModelsPrimary: await this.modelsFor(KEY_CLAUDE_MODELS_PRIMARY),
       claudeModelsFallback: await this.modelsFor(KEY_CLAUDE_MODELS_FALLBACK),
+      emailVerifyEnabled: await this.getEmailVerifyEnabled(),
+      emailVerifyProxyHost: (await this.readRaw(KEY_EMAIL_PROXY_HOST)) || '',
+      emailVerifyProxyPort:
+        Number.parseInt((await this.readRaw(KEY_EMAIL_PROXY_PORT)) || '', 10) || null,
+      emailVerifyProxyUsername: (await this.readRaw(KEY_EMAIL_PROXY_USERNAME)) || '',
+      hasEmailVerifyProxyPassword: Boolean(await this.readRaw(KEY_EMAIL_PROXY_PASSWORD)),
+      emailVerifyFromEmail: (await this.readRaw(KEY_EMAIL_FROM_EMAIL)) || '',
+      emailVerifyHelloName: (await this.readRaw(KEY_EMAIL_HELLO_NAME)) || '',
     };
   }
 
@@ -312,7 +405,43 @@ class SettingsStore {
     for (const [key, value] of entries) {
       if (value !== undefined && value !== '') await this.write(key, value);
     }
+    // Email-verify fields may be cleared (blank host = no proxy), so '' is written
+    // too; only the write-only proxy password keeps the "blank = unchanged" rule.
+    const clearable: Array<[string, string | undefined]> = [
+      // '' = follow the sub-agent model
+      [KEY_QUALITY_MODEL, input.qualityModel],
+      [KEY_LEARNING_MODEL, input.learningModel],
+      [
+        KEY_EMAIL_VERIFY_ENABLED,
+        input.emailVerifyEnabled === undefined ? undefined : String(input.emailVerifyEnabled),
+      ],
+      [KEY_EMAIL_PROXY_HOST, input.emailVerifyProxyHost?.trim()],
+      [
+        KEY_EMAIL_PROXY_PORT,
+        input.emailVerifyProxyPort === undefined ? undefined : String(input.emailVerifyProxyPort ?? ''),
+      ],
+      [KEY_EMAIL_PROXY_USERNAME, input.emailVerifyProxyUsername?.trim()],
+      [KEY_EMAIL_FROM_EMAIL, input.emailVerifyFromEmail?.trim()],
+      [KEY_EMAIL_HELLO_NAME, input.emailVerifyHelloName?.trim()],
+    ];
+    for (const [key, value] of clearable) {
+      if (value !== undefined) await this.write(key, value);
+    }
+    if (input.emailVerifyProxyPassword) {
+      await this.write(KEY_EMAIL_PROXY_PASSWORD, input.emailVerifyProxyPassword);
+    }
   }
 }
 
 export const settings = new SettingsStore();
+
+/** Encrypt a secret for storage outside the Setting table (e.g. the WeChat bot token). */
+export function sealSecret(plain: string): string {
+  const { value, encrypted } = encrypt(plain);
+  return encrypted ? `enc:${value}` : plain;
+}
+
+/** Reverse of sealSecret (plain values pass through unchanged). */
+export function openSecret(stored: string): string {
+  return stored.startsWith('enc:') ? decrypt(stored.slice(4)) : stored;
+}

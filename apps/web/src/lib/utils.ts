@@ -22,8 +22,10 @@ export function formatTokens(n: number): string {
   return `${(n / 1_000_000).toFixed(2)}M`;
 }
 
+const usd4 = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 4, maximumFractionDigits: 4 });
+const usd2 = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
 export function formatCost(usd: number): string {
-  return `$${usd.toFixed(usd < 1 ? 4 : 2)}`;
+  return (usd < 1 ? usd4 : usd2).format(usd);
 }
 
 export function formatBytes(n: number): string {
@@ -55,13 +57,19 @@ export function withAttachmentNote(text: string, items: UploadedAttachment[]): s
   return text ? `${text}\n\n${note}` : note;
 }
 
+const rtf = new Intl.RelativeTimeFormat('zh-CN', { numeric: 'auto' });
+const dateFmt = new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'numeric', day: 'numeric' });
+
+/** "刚刚 / 5 分钟前 / 3 小时前 / 昨天 / 4 天前", then the date after a month (Intl, not hand-rolled). */
 export function relativeTime(iso: string): string {
   const d = new Date(iso).getTime();
   const diff = Date.now() - d;
   const m = Math.floor(diff / 60000);
-  if (m < 1) return 'just now';
-  if (m < 60) return `${m}m ago`;
+  if (m < 1) return '刚刚';
+  if (m < 60) return rtf.format(-m, 'minute');
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
+  if (h < 24) return rtf.format(-h, 'hour');
+  const days = Math.floor(h / 24);
+  if (days < 30) return rtf.format(-days, 'day');
+  return dateFmt.format(d);
 }

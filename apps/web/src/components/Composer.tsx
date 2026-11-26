@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowUp, Paperclip, Square } from 'lucide-react';
 import { AttachmentTray } from '@/components/AttachmentTray';
 import { useAttachmentDraft } from '@/hooks/useAttachmentDraft';
@@ -7,8 +7,27 @@ import { useStore } from '@/lib/store';
 import { getSocket } from '@/lib/ws';
 import { cn, withAttachmentNote } from '@/lib/utils';
 
+const draftKey = (sessionId: string) => `chapi-draft:${sessionId}`;
+
 export function Composer({ sessionId, disabled }: { sessionId: string; disabled?: boolean }) {
-  const [text, setText] = useState('');
+  const [text, setTextState] = useState('');
+  // The unsent text is kept per session (survives reload / switching conversations).
+  useEffect(() => {
+    try {
+      setTextState(localStorage.getItem(draftKey(sessionId)) ?? '');
+    } catch {
+      setTextState('');
+    }
+  }, [sessionId]);
+  const setText = (v: string) => {
+    setTextState(v);
+    try {
+      if (v) localStorage.setItem(draftKey(sessionId), v);
+      else localStorage.removeItem(draftKey(sessionId));
+    } catch {
+      /* storage unavailable: the draft just lasts this page */
+    }
+  };
   const [sending, setSending] = useState(false);
   const runState = useStore((s) => s.runState);
   const addUser = useStore((s) => s.addOptimisticUser);
@@ -44,8 +63,8 @@ export function Composer({ sessionId, disabled }: { sessionId: string; disabled?
 
   if (disabled) {
     return (
-      <div className="rounded-xl border border-border bg-panel px-4 py-3 text-center text-sm text-muted">
-        该任务已标记完成，对话只读。
+      <div className="rounded-2xl border border-border bg-panel px-4 py-3 text-center text-sm text-muted">
+        该任务已标记完成，对话只读
       </div>
     );
   }
@@ -54,12 +73,12 @@ export function Composer({ sessionId, disabled }: { sessionId: string; disabled?
     <div
       {...draft.dropProps}
       className={cn(
-        'relative rounded-2xl border bg-panel p-2 transition',
-        draft.dragActive ? 'border-accent ring-2 ring-accent/30' : 'border-border',
+        'relative rounded-2xl border bg-panel p-2 transition-colors duration-150 ease-ui',
+        draft.dragActive ? 'border-accent ring-2 ring-accent/30' : 'border-border focus-within:border-accent',
       )}
     >
       {draft.dragActive && (
-        <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center rounded-2xl bg-panel/90 text-sm text-accent">
+        <div className="anim-fade pointer-events-none absolute inset-0 z-10 grid place-items-center rounded-2xl bg-panel/95 text-sm text-accent">
           松手即可添加文件
         </div>
       )}
@@ -77,35 +96,43 @@ export function Composer({ sessionId, disabled }: { sessionId: string; disabled?
           }
         }}
         rows={2}
-        placeholder="继续对话、补充要求，或随时中断…（可拖入或粘贴文件、截图）"
-        className="max-h-48 w-full resize-none bg-transparent px-3 py-2 text-[15px] outline-none placeholder:text-muted/50"
+        aria-label="给 AI 的消息"
+        placeholder="继续对话、补充要求，或随时中断…"
+        className="max-h-48 w-full resize-none bg-transparent px-3 py-2 text-[14px] leading-relaxed outline-none placeholder:text-muted max-sm:text-base"
       />
       <div className="flex items-center justify-between p-1">
         <button
           onClick={draft.openPicker}
           disabled={sending}
-          className="rounded-lg p-2 text-muted transition hover:bg-panel2 hover:text-text disabled:opacity-50"
-          title="添加文件/图片"
+          className="btn btn--ghost btn--icon"
+          title="添加文件或图片（也可拖入、粘贴）"
+          aria-label="添加文件或图片"
         >
-          <Paperclip size={18} />
+          <Paperclip size={18} aria-hidden />
         </button>
         <input ref={draft.inputRef} type="file" multiple hidden onChange={draft.onInputChange} />
         <div className="flex items-center gap-2">
-          {draft.uploading && <span className="text-xs text-muted">上传中…</span>}
+          {draft.uploading && (
+            <span className="text-xs text-muted" role="status">
+              上传中…
+            </span>
+          )}
           {running && (
             <button
               onClick={() => getSocket().send({ type: 'interrupt', sessionId })}
-              className="inline-flex items-center gap-1 rounded-lg bg-panel2 px-3 py-2 text-sm text-warn transition hover:bg-border"
+              className="btn btn--secondary text-warn"
             >
-              <Square size={14} /> 中断
+              <Square size={14} aria-hidden /> 中断
             </button>
           )}
           <button
             onClick={() => void send()}
             disabled={sending || (!text.trim() && draft.items.length === 0)}
-            className="grid h-9 w-9 place-items-center rounded-xl bg-accent text-white transition hover:brightness-110 disabled:opacity-40"
+            className="btn btn--primary btn--icon"
+            aria-label="发送"
+            title="发送（Enter）"
           >
-            <ArrowUp size={18} />
+            <ArrowUp size={18} aria-hidden />
           </button>
         </div>
       </div>

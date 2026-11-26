@@ -16,6 +16,7 @@ export interface RunConfig {
   language: Language;
   accountMode: AccountMode;
   qualityReviewMinutes: number; // 0 = off
+  qualityModel: string; // "" = follow the sub-agent model
 }
 
 const QR_OPTIONS: { v: number; label: string }[] = [
@@ -27,7 +28,7 @@ const QR_OPTIONS: { v: number; label: string }[] = [
   { v: 60, label: '每 60 分钟' },
 ];
 
-const effortLabel: Record<EffortLevel, string> = {
+export const effortLabel: Record<EffortLevel, string> = {
   low: '低',
   medium: '中',
   high: '高',
@@ -36,7 +37,17 @@ const effortLabel: Record<EffortLevel, string> = {
 };
 
 const selectCls =
-  'rounded-md border border-border bg-panel2 px-2 py-1 text-xs text-text outline-none focus:border-accent disabled:opacity-50';
+  'select-sm h-8 min-w-0 cursor-pointer rounded-md border border-border bg-panel pl-2 pr-1 text-xs text-text transition-colors hover:border-text/30 focus-visible:border-accent disabled:cursor-not-allowed disabled:opacity-50';
+
+/** A label wrapped around its control: one hit target, readable by screen readers. */
+function Labeled({ text, stack, children }: { text: string; stack?: boolean; children: React.ReactNode }) {
+  return (
+    <label className={stack ? 'flex min-w-0 flex-col gap-1' : 'flex min-w-0 items-center gap-1.5'}>
+      <span className="shrink-0 text-xs text-muted">{text}</span>
+      {children}
+    </label>
+  );
+}
 
 /**
  * The account / main-model / sub-model / effort / language selectors, shared by the
@@ -50,12 +61,16 @@ export function ConfigSelectors({
   settings,
   disabled,
   onChange,
+  stack,
 }: {
   value: RunConfig;
   settings?: PublicSettingsDTO;
   disabled?: boolean;
   onChange: (partial: Partial<RunConfig>) => void;
+  /** Label above a full-width control (narrow screens / grids) instead of inline. */
+  stack?: boolean;
 }) {
+  const sel = stack ? `${selectCls} w-full` : `${selectCls} max-w-[200px]`;
   const st = settings;
   const tokensConfigured = Boolean(st && (st.hasClaudeTokenPrimary || st.hasClaudeTokenFallback));
   const allowedIds =
@@ -69,12 +84,12 @@ export function ConfigSelectors({
     let opts = MODEL_OPTIONS as ReadonlyArray<{ id: string; label: string }>;
     if (allowedIds && allowedIds.length) opts = opts.filter((m) => allowedIds.includes(m.id));
     if (opts.length === 0) opts = MODEL_OPTIONS;
-    return opts.some((m) => m.id === cur) ? opts : [{ id: cur, label: cur || '(默认)' }, ...opts];
+    return opts.some((m) => m.id === cur) ? opts : [{ id: cur, label: cur || '（默认）' }, ...opts];
   };
 
   const acctLabel = (m: AccountMode) =>
     m === 'auto'
-      ? '自动(主→备)'
+      ? '自动（主→备）'
       : m === 'primary'
         ? `主号${st?.claudeEmailPrimary ? ` · ${st.claudeEmailPrimary}` : ''}`
         : `备号${st?.claudeEmailFallback ? ` · ${st.claudeEmailFallback}` : ''}`;
@@ -89,6 +104,7 @@ export function ConfigSelectors({
     if (tokensConfigured && next && next.length) {
       if (!next.includes(value.model)) partial.model = topAllowedModel(next);
       if (!next.includes(value.subagentModel)) partial.subagentModel = topAllowedModel(next);
+      if (value.qualityModel && !next.includes(value.qualityModel)) partial.qualityModel = '';
     }
     onChange(partial);
   };
@@ -96,93 +112,97 @@ export function ConfigSelectors({
   return (
     <>
       {tokensConfigured && (
-        <>
-          <span className="text-xs text-muted">账号</span>
+        <Labeled text="账号" stack={stack}>
           <select
-            className={selectCls}
+            className={sel}
             value={value.accountMode}
             disabled={disabled}
             onChange={(e) => onAccount(e.target.value as AccountMode)}
-            title="选择使用哪个 Claude 账号(自动=主号优先、限额切备用；也可手动锁定)"
+            title="选择使用哪个 Claude 账号（自动 = 主号优先、限额切备用；也可手动锁定）"
           >
             <option value="auto">{acctLabel('auto')}</option>
             <option value="primary">{acctLabel('primary')}</option>
             <option value="fallback">{acctLabel('fallback')}</option>
           </select>
-        </>
+        </Labeled>
       )}
 
-      <span className={tokensConfigured ? 'ml-3 text-xs text-muted' : 'text-xs text-muted'}>主代理</span>
-      <select
-        className={selectCls}
-        value={value.model}
-        disabled={disabled}
-        onChange={(e) => onChange({ model: e.target.value })}
-        title="主编排代理的模型(按所选账号可用范围过滤)"
-      >
-        {modelOpts(value.model).map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.label}
-          </option>
-        ))}
-      </select>
+      <Labeled text="主代理" stack={stack}>
+        <select
+          className={sel}
+          value={value.model}
+          disabled={disabled}
+          onChange={(e) => onChange({ model: e.target.value })}
+          title="主编排代理的模型（按所选账号可用范围过滤）"
+        >
+          {modelOpts(value.model).map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.label}
+            </option>
+          ))}
+        </select>
+      </Labeled>
 
-      <span className="ml-3 text-xs text-muted">子代理</span>
-      <select
-        className={selectCls}
-        value={value.subagentModel}
-        disabled={disabled}
-        onChange={(e) => onChange({ subagentModel: e.target.value })}
-        title="子代理(Task 派发)的模型(按所选账号可用范围过滤)"
-      >
-        {modelOpts(value.subagentModel).map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.label}
-          </option>
-        ))}
-      </select>
+      <Labeled text="子代理" stack={stack}>
+        <select
+          className={sel}
+          value={value.subagentModel}
+          disabled={disabled}
+          onChange={(e) => onChange({ subagentModel: e.target.value })}
+          title="子代理（Task 派发）的模型（按所选账号可用范围过滤）"
+        >
+          {modelOpts(value.subagentModel).map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.label}
+            </option>
+          ))}
+        </select>
+      </Labeled>
 
-      <span className="ml-3 text-xs text-muted">思考强度</span>
-      <select
-        className={selectCls}
-        value={value.effort}
-        disabled={disabled}
-        onChange={(e) => onChange({ effort: e.target.value as EffortLevel })}
-        title="推理强度"
-      >
-        {EFFORT_LEVELS.map((e) => (
-          <option key={e} value={e}>
-            {effortLabel[e]}
-          </option>
-        ))}
-      </select>
+      <Labeled text="思考强度" stack={stack}>
+        <select
+          className={sel}
+          value={value.effort}
+          disabled={disabled}
+          onChange={(e) => onChange({ effort: e.target.value as EffortLevel })}
+          title="推理强度"
+        >
+          {EFFORT_LEVELS.map((e) => (
+            <option key={e} value={e}>
+              {effortLabel[e]}
+            </option>
+          ))}
+        </select>
+      </Labeled>
 
-      <span className="ml-3 text-xs text-muted">语言</span>
-      <select
-        className={selectCls}
-        value={value.language}
-        disabled={disabled}
-        onChange={(e) => onChange({ language: e.target.value as Language })}
-        title="与用户交流的语言(表格/邮件/查资料仍默认英文)"
-      >
-        <option value="zh">中文</option>
-        <option value="en">English</option>
-      </select>
+      <Labeled text="语言" stack={stack}>
+        <select
+          className={sel}
+          value={value.language}
+          disabled={disabled}
+          onChange={(e) => onChange({ language: e.target.value as Language })}
+          title="与用户交流的语言（表格、邮件、查资料仍默认英文）"
+        >
+          <option value="zh">中文</option>
+          <option value="en">English</option>
+        </select>
+      </Labeled>
 
-      <span className="ml-3 text-xs text-muted">质检</span>
-      <select
-        className={selectCls}
-        value={value.qualityReviewMinutes}
-        disabled={disabled}
-        onChange={(e) => onChange({ qualityReviewMinutes: Number(e.target.value) })}
-        title="自动质检频率:每隔多久评估一次阶段性产物(关闭则不自动质检)"
-      >
-        {QR_OPTIONS.map((o) => (
-          <option key={o.v} value={o.v}>
-            {o.label}
-          </option>
-        ))}
-      </select>
+      <Labeled text="质检" stack={stack}>
+        <select
+          className={sel}
+          value={value.qualityReviewMinutes}
+          disabled={disabled}
+          onChange={(e) => onChange({ qualityReviewMinutes: Number(e.target.value) })}
+          title="自动质检频率：主代理工作时每隔多久评估一次（关闭则不质检，也不做交付前把关）"
+        >
+          {QR_OPTIONS.map((o) => (
+            <option key={o.v} value={o.v}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </Labeled>
     </>
   );
 }

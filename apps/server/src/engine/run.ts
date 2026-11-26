@@ -13,6 +13,7 @@ import { sessionUsage, toMessageDTO, toSessionDTO } from '../mappers.js';
 import { settings } from '../secrets.js';
 import { extractContent } from './content.js';
 import { buildHooks } from './hooks.js';
+import { sopCatalog } from '../workflow/catalog.js';
 import { InputQueue } from './inputQueue.js';
 import { RunMonitor } from './monitoring.js';
 import { buildRunOptions } from './options.js';
@@ -136,7 +137,7 @@ export class Run {
       session.id,
       session.permissionProfile as PermissionProfile,
     );
-    const hooks = buildHooks(this.monitor);
+    const hooks = buildHooks(this.monitor, session.id);
     const chapiServer = buildChapiToolServer(session.id);
     const external = await buildExternalMcpServers();
     const summary = await latestSummary(session.id);
@@ -155,7 +156,6 @@ export class Run {
         'Grep',
         'Glob',
         'LS',
-        'TodoWrite',
         'Task',
         'WebSearch',
         'WebFetch',
@@ -163,6 +163,7 @@ export class Run {
       ],
       extraSystemContext: summary,
       maxSubagents,
+      sopCatalog: await sopCatalog().catch(() => null),
       abortController: this.abort,
     });
 

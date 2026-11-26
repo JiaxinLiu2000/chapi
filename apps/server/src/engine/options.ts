@@ -10,6 +10,7 @@ import type { Language, PermissionProfile } from '@chapi/shared';
 import { config, sessionPaths } from '../config.js';
 import { disallowedToolsFor } from './permissions.js';
 import { buildSystemPrompt } from './systemPrompt.js';
+import { USER_CHROME_RELAY_TOKEN } from '../services/userChromeRelay.js';
 
 export interface BuildOptionsDeps {
   canUseTool: CanUseTool;
@@ -20,6 +21,8 @@ export interface BuildOptionsDeps {
   allowedTools?: string[];
   extraSystemContext?: string | null;
   maxSubagents?: number;
+  /** Confirmed SOP catalog lines for the system prompt (workflow engine). */
+  sopCatalog?: string | null;
   abortController: AbortController;
 }
 
@@ -69,12 +72,14 @@ export function buildRunOptions(session: Session, deps: BuildOptionsDeps): Optio
         deps.extraSystemContext,
         deps.maxSubagents,
         session.language as Language,
+        deps.sopCatalog ?? null,
       ),
     },
     canUseTool: deps.canUseTool,
     hooks: deps.hooks,
     allowedTools: deps.allowedTools,
-    disallowedTools: disallowedToolsFor(profile),
+    // TodoWrite would bypass the task flow's reasons/replacements → plan only via set_plan / update_plan_step.
+    disallowedTools: [...disallowedToolsFor(profile), 'TodoWrite'],
     permissionMode: 'default',
     includePartialMessages: true,
     agentProgressSummaries: true,
@@ -101,6 +106,12 @@ export function buildRunOptions(session: Session, deps: BuildOptionsDeps): Optio
       // here to (re)start cloakbrowser on demand if it isn't reachable, instead
       // of just failing when it happened to have died since it was last enabled.
       CHAPI_SERVER_URL: `http://127.0.0.1:${config.serverPort}`,
+      // Lets chapi_browser.py ask the server whether THIS session may use the
+      // user's own Chrome (top-bar opt-in, GET /api/user-chrome/:id).
+      CHAPI_SESSION_ID: session.id,
+      // Secret for the user-Chrome relay (/cdp/user-chrome) so only chapi's own
+      // scripts — not an arbitrary web page — can drive the user's Chrome.
+      CHAPI_USER_CHROME_TOKEN: USER_CHROME_RELAY_TOKEN,
       // Force UTF-8 for the agent's Python scripts so non-ASCII output (e.g. the
       // "→" arrow, Chinese) doesn't crash on the Windows cp1252 console.
       PYTHONUTF8: '1',

@@ -51,7 +51,15 @@ export function describeActivity(toolName: string, input: unknown): ToolActivity
     const action = toolName.replace('mcp__google_workspace__', '').replace(/_/g, ' ');
     return { tag: 'Google', label: `Google Workspace: ${action}` };
   }
+  if (toolName.startsWith('mcp__gmail__')) {
+    const action = toolName.replace('mcp__gmail__', '').replace(/_/g, ' ');
+    return { tag: 'Gmail', label: `Gmail(草稿账号): ${action}` };
+  }
   if (toolName.startsWith('mcp__canva__')) return { tag: 'Canva', label: 'Canva 设计/导出' };
+  if (toolName.startsWith('mcp__chief__')) {
+    const action = toolName.replace('mcp__chief__', '').replace(/_/g, ' ');
+    return { tag: 'The Chief', label: `The Chief: ${action}` };
+  }
   if (toolName.startsWith('mcp__context7__')) return { tag: '查文档', label: '查阅库/框架官方文档' };
 
   switch (toolName) {

@@ -1,6 +1,6 @@
 {
   "name": "@chapi/web",
-  "version": "0.1.66",
+  "version": "0.1.73",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,13 +13,17 @@
   "dependencies": {
     "@chapi/shared": "workspace:*",
     "@tanstack/react-query": "^5.64.1",
+    "@xyflow/react": "12.12.1",
     "clsx": "^2.1.1",
+    "katex": "^0.16",
     "lucide-react": "^0.469.0",
     "next": "^15.1.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^9.0.3",
+    "rehype-katex": "^7",
     "remark-gfm": "^4.0.0",
+    "remark-math": "^6",
     "tailwind-merge": "^2.6.0",
     "zustand": "^5.0.3"
   },

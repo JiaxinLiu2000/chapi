@@ -9,6 +9,8 @@ import {
 import { createLogger } from '../logger.js';
 import { getOrchestrator } from '../orchestrator/types.js';
 import { browserView } from '../engine/browserView.js';
+import { USER_CHROME_RELAY_PATH, handleUserChromeRelayUpgrade } from '../services/userChromeRelay.js';
+import { currentRunState } from '../services/sessions.js';
 import { bus, isGlobalEvent } from './bus.js';
 
 const log = createLogger('ws');
@@ -23,7 +25,19 @@ function eventSessionId(event: ServerEvent): string | null {
 }
 
 export function attachWebSocket(server: HttpServer): WebSocketServer {
-  const wss = new WebSocketServer({ server, path: WS_PATH });
+  // noServer + our own upgrade router: a `{ server, path }` WebSocketServer answers
+  // 400 to every upgrade on any other path, which would break the user-Chrome relay.
+  const wss = new WebSocketServer({ noServer: true });
+  server.on('upgrade', (req, socket, head) => {
+    const pathname = new URL(req.url ?? '/', 'http://localhost').pathname;
+    if (pathname === WS_PATH) {
+      wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
+    } else if (pathname === USER_CHROME_RELAY_PATH) {
+      handleUserChromeRelayUpgrade(req, socket, head);
+    } else {
+      socket.destroy();
+    }
+  });
 
   wss.on('connection', (socket: WebSocket) => {
     const subscribed = new Set<string>();
@@ -60,6 +74,9 @@ export function attachWebSocket(server: HttpServer): WebSocketServer {
             return;
           case 'session.subscribe':
             subscribed.add(cmd.sessionId);
+            // Replay the current run state: transitions missed while this socket
+            // was away (reload / reconnect) would otherwise leave the UI 'idle'.
+            send({ type: 'run.state', sessionId: cmd.sessionId, state: currentRunState(cmd.sessionId) });
             return;
           case 'session.unsubscribe':
             subscribed.delete(cmd.sessionId);
@@ -101,7 +118,12 @@ export function attachWebSocket(server: HttpServer): WebSocketServer {
               cmd.language,
               cmd.accountMode,
               cmd.qualityReviewMinutes,
+              cmd.qualityModel,
+              cmd.userChrome,
             );
+            return;
+          case 'quality.run':
+            void getOrchestrator().runQualityReview(cmd.sessionId);
             return;
           case 'browser.view':
             if (cmd.on) {

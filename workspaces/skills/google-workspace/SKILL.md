@@ -9,8 +9,15 @@
 ## 如何使用
 - 工具前缀：`mcp__google_workspace__*`（taylorwilsdon/google_workspace_mcp，运行在 `--tool-tier extended`）。
   例：创建/修改文档、`modify_sheet_values`、Drive 上传、`draft_gmail_message`。
-- **Gmail 建草稿**：用 `mcp__google_workspace__draft_gmail_message`（属 extended 档；core 档没有，
-  所以平台已用 extended 启动）。建好后把草稿信息回报用户，不要尝试发送。
+- **Gmail 建草稿**：配置了 `GMAIL_DRAFT_EMAIL`（当前为 jiaxin.liu@unitpulse.ai）时，Gmail 只在
+  独立的 `gmail` MCP 上：用 `mcp__gmail__draft_gmail_message`（user_google_email 填该地址），回复
+  已有邮件先用 `mcp__gmail__search_gmail_messages` 找 thread_id。该账号的授权里根本没有 gmail.send，
+  也没有改标签/删信工具。未配置时退回 `mcp__google_workspace__draft_gmail_message`（extended 档）。
+  建好后把草稿信息回报用户，不要尝试发送。
+- **只读邮箱（sales 邮箱等）**：`GMAIL_READONLY_EMAILS` 里的每个地址各有一个 `gmail_ro_<名字>` MCP
+  （如 raymond.fernandez@unitpulse.ai → `mcp__gmail_ro_raymond_fernandez__*`），授权只有 gmail.readonly，
+  只能 `search_gmail_messages` / `get_gmail_message_content` / 线程读取。按联系人邮箱精确搜索
+  （`from:x OR to:x`），不要整箱下载；正文去掉引用历史和签名后再处理。
 - **Apps Script**（已启用 Apps Script API）：用 google_workspace 暴露的 script 类工具创建/更新/运行
   Apps Script 项目，做表格/文档的批量自动化。脚本里**同样禁止发送邮件**（只 `createDraft`，不 `send`）。
 - **防冲突**：在 Drive 的专用文件夹 `Chapi/<会话slug>/` 下创建文件；文件名带会话/时间前缀；

@@ -19,6 +19,9 @@ sessions/
 data/
 workspaces/raw-materials/*
 !workspaces/raw-materials/INDEX.md
+# AI Wiki = the user's Obsidian vault (knowledge, not code)
+workspaces/ai-wiki/*
+!workspaces/ai-wiki/INDEX.md
 .browser-profile/
 
 # python sidecars
@@ -39,3 +42,6 @@ Thumbs.db
 
 # prisma
 apps/server/prisma/*.db
+
+# Playwright MCP page snapshots (debug artifacts)
+.playwright-mcp/

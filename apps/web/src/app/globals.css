@@ -2,8 +2,115 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Theme tokens. Values are RGB channels for Tailwind alpha. The default (no
+ * data-palette) equals "amber"; the five reviewed palettes at the end of this file
+ * override them via <html data-palette>, switchable from the top-right picker.
+ * primary = filled buttons / logo; accent = text links and focus.
+ */
 :root {
+  color-scheme: light;
+  --c-bg: 244 244 242;
+  --c-panel: 253 253 252;
+  --c-panel2: 239 238 235;
+  --c-border: 226 224 220;
+  --c-muted: 93 90 84;
+  --c-text: 36 34 30;
+  --c-accent: 147 88 12;
+  --c-on-accent: 255 255 255;
+  --c-primary: 168 98 12;
+  --c-on-primary: 255 255 255;
+  --c-bronze: 194 118 19;
+  --c-sand: 242 195 122;
+  --c-success: 29 127 67;
+  --c-danger: 194 58 44;
+  --c-warn: 147 88 12;
+  --c-scrim: 36 34 30;
+  --tone-accent: 249 233 206;
+  --tone-accent-fg: 147 88 12;
+
+  /* Tag tones (activity chips): background / foreground */
+  --tone-sky: 227 240 253;     --tone-sky-fg: 11 83 148;
+  --tone-amber: 253 241 216;   --tone-amber-fg: 138 83 0;
+  --tone-teal: 217 243 239;    --tone-teal-fg: 11 97 88;
+  --tone-green: 220 244 228;   --tone-green-fg: 26 107 53;
+  --tone-red: 253 228 228;     --tone-red-fg: 180 35 24;
+  --tone-rose: 253 228 238;    --tone-rose-fg: 166 27 85;
+  --tone-slate: 233 237 242;   --tone-slate-fg: 61 75 92;
+  --tone-neutral: 238 239 241; --tone-neutral-fg: 75 79 87;
+
+  --font-cjk: 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --font-display: 'IBM Plex Sans', var(--font-cjk);
+  --font-text: 'IBM Plex Sans', var(--font-cjk);
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+:root[data-theme='dark'] {
   color-scheme: dark;
+  --c-bg: 29 28 26;
+  --c-panel: 38 37 34;
+  --c-panel2: 47 45 42;
+  --c-border: 58 56 52;
+  --c-muted: 170 165 156;
+  --c-text: 235 232 226;
+  --c-accent: 233 189 120;
+  --c-on-accent: 29 28 26;
+  --c-primary: 233 189 120;
+  --c-on-primary: 29 28 26;
+  --c-bronze: 233 189 120;
+  --c-sand: 233 189 120;
+  --c-success: 124 203 148;
+  --c-danger: 240 138 124;
+  --c-warn: 233 189 120;
+  --c-scrim: 0 0 0;
+  --tone-accent: 73 64 49;
+  --tone-accent-fg: 233 189 120;
+
+  --tone-sky: 30 58 95;      --tone-sky-fg: 124 196 255;
+  --tone-amber: 74 52 16;    --tone-amber-fg: 245 185 85;
+  --tone-teal: 14 59 59;     --tone-teal-fg: 95 227 208;
+  --tone-green: 16 64 42;    --tone-green-fg: 95 227 154;
+  --tone-red: 74 31 31;      --tone-red-fg: 255 138 138;
+  --tone-rose: 74 31 58;     --tone-rose-fg: 255 138 208;
+  --tone-slate: 42 51 64;    --tone-slate-fg: 157 180 204;
+  --tone-neutral: 42 45 51;  --tone-neutral-fg: 185 188 196;
+}
+
+/* "Follow the system": dark when the OS is dark and no explicit light choice. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --c-bg: 29 28 26;
+    --c-panel: 38 37 34;
+    --c-panel2: 47 45 42;
+    --c-border: 58 56 52;
+    --c-muted: 170 165 156;
+    --c-text: 235 232 226;
+    --c-accent: 233 189 120;
+    --c-on-accent: 29 28 26;
+    --c-primary: 233 189 120;
+    --c-on-primary: 29 28 26;
+    --c-bronze: 233 189 120;
+    --c-sand: 233 189 120;
+    --c-success: 124 203 148;
+    --c-danger: 240 138 124;
+    --c-warn: 233 189 120;
+    --c-scrim: 0 0 0;
+    --tone-accent: 73 64 49;
+    --tone-accent-fg: 233 189 120;
+
+    --tone-sky: 30 58 95;      --tone-sky-fg: 124 196 255;
+    --tone-amber: 74 52 16;    --tone-amber-fg: 245 185 85;
+    --tone-teal: 14 59 59;     --tone-teal-fg: 95 227 208;
+    --tone-green: 16 64 42;    --tone-green-fg: 95 227 154;
+    --tone-red: 74 31 31;      --tone-red-fg: 255 138 138;
+    --tone-rose: 74 31 58;     --tone-rose-fg: 255 138 208;
+    --tone-slate: 42 51 64;    --tone-slate-fg: 157 180 204;
+    --tone-neutral: 42 45 51;  --tone-neutral-fg: 185 188 196;
+  }
 }
 
 html,
@@ -11,36 +118,539 @@ body {
   height: 100%;
 }
 
-body {
-  @apply bg-bg text-text antialiased;
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+/* No page rubber-band on desktop; touch keeps its native pull behaviour. */
+@media (pointer: fine) {
+  html {
+    overscroll-behavior: none;
+  }
 }
 
-/* Thin scrollbars */
+body {
+  @apply bg-bg font-sans text-text antialiased;
+  font-feature-settings: normal;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  text-wrap: balance;
+}
+p,
+li {
+  text-wrap: pretty;
+}
+
+button,
+a,
+label,
+select,
+summary,
+[role='button'] {
+  touch-action: manipulation;
+}
+
+/* Icons: one stroke weight beside regular text (lucide draws on a 24 grid). */
+svg.lucide {
+  stroke-width: 1.75;
+  flex-shrink: 0;
+}
+
+/* <details>: the browser's ▶ marker becomes the same chevron the rest of the UI uses. */
+summary {
+  list-style: none;
+}
+summary::-webkit-details-marker {
+  display: none;
+}
+summary::before {
+  content: '';
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 4px;
+  vertical-align: -1px;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+  transition: transform 150ms var(--ease-out);
+}
+details[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+/* Pictures get a neutral hairline so their edge reads on any surface. */
+img {
+  outline: 1px solid oklch(0 0 0 / 0.1);
+  outline-offset: -1px;
+}
+:root[data-theme='dark'] img {
+  outline-color: oklch(1 0 0 / 0.1);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) img {
+    outline-color: oklch(1 0 0 / 0.1);
+  }
+}
+
+/* Focus shows at once: 2px ring in the accent, never animated. */
+:where(button, a, select, summary, [tabindex]:not([tabindex='-1'])):focus-visible {
+  outline: 2px solid rgb(var(--c-accent));
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+/* Checkboxes, switches and sliders get the same ring (their own shape kept). */
+:where(input[type='checkbox'], input[type='radio'], input[type='range']):focus-visible {
+  outline: 2px solid rgb(var(--c-accent));
+  outline-offset: 2px;
+}
+
+/* Skip link: off-screen until focused from the keyboard, then pinned top-left over the bar. */
+.skip-link {
+  position: fixed;
+  left: 8px;
+  top: 8px;
+  z-index: 100;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgb(var(--c-panel));
+  color: rgb(var(--c-text));
+  border: 1px solid rgb(var(--c-border));
+  font-size: 14px;
+  transform: translateY(-200%);
+}
+.skip-link:focus-visible {
+  transform: none;
+}
+
+::selection {
+  background: rgb(var(--c-accent) / 0.22);
+}
+
+/* ── Scrollbars ───────────────────────────────────────────────────────────
+ * Thin, quiet, no track; the thumb is inset 2px (transparent border +
+ * padding-box) so it floats off the edge, and darkens on hover. Firefox gets
+ * the standard properties. Scroll areas keep their scroll to themselves. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2a2f3a transparent;
+  scrollbar-color: rgb(var(--c-text) / 0.18) transparent;
 }
 *::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  background: #2a2f3a;
-  border-radius: 4px;
+  background-color: rgb(var(--c-text) / 0.16);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  min-height: 32px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(var(--c-text) / 0.32);
+}
+*::-webkit-scrollbar-button {
+  display: none;
+  height: 0;
+  width: 0;
+}
+/* Pages that scroll the document (board, SOP list) keep the gutter, so switching
+ * between a short and a long view — or opening a modal, which locks the page —
+ * doesn't shift everything sideways. App-shell pages scroll inside panels instead. */
+:root:has(.page-scroll) {
+  scrollbar-gutter: stable;
+}
+@layer utilities {
+  /* Meta text (dates, counts, hints): the smallest size in the app. */
+  .text-2xs {
+    font-size: 12px;
+    line-height: 16px;
+  }
+  /* A scrolling region: no scroll chaining to the page, stable gutter (no layout jump). */
+  .scroll-area {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+  .scroll-x {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .pb-safe {
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+}
+
+/* ── Enter / exit motion ──────────────────────────────────────────────────
+ * Enter: fade + 4px rise (+ a hair of scale for popovers), 160–200ms ease-out.
+ * Exit (where kept): softer and shorter, 120ms. Never on high-frequency hover. */
+@keyframes enter-pop {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+}
+@keyframes enter-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes enter-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@keyframes enter-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes enter-left {
+  from {
+    transform: translateX(-100%);
+  }
+}
+@keyframes enter-right {
+  from {
+    transform: translateX(100%);
+  }
+}
+@keyframes enter-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes exit-pop {
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+}
+@keyframes exit-fade {
+  to {
+    opacity: 0;
+  }
+}
+@layer utilities {
+  .anim-pop {
+    animation: enter-pop 180ms var(--ease-out) both;
+    transform-origin: var(--origin, top center);
+  }
+  .anim-rise {
+    animation: enter-rise 200ms var(--ease-out) both;
+  }
+  .anim-drop {
+    animation: enter-drop 160ms var(--ease-out) both;
+  }
+  .anim-fade {
+    animation: enter-fade 160ms var(--ease-out) both;
+  }
+  .anim-sheet-left {
+    animation: enter-left 220ms var(--ease-out) both;
+  }
+  .anim-sheet-right {
+    animation: enter-right 220ms var(--ease-out) both;
+  }
+  .anim-sheet-up {
+    animation: enter-up 240ms var(--ease-out) both;
+  }
+  .anim-exit-pop {
+    animation: exit-pop 120ms var(--ease-out) both;
+  }
+  .anim-exit-fade {
+    animation: exit-fade 120ms var(--ease-out) both;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── One button system ─────────────────────────────────────────────────────
+ * .btn + one of: --primary (the only filled accent), --secondary (outline),
+ * --ghost (icon/quiet), --success / --danger (semantic fills for approve/delete).
+ * Hover: a colour/surface step only (fine pointer); press: scale .96.
+ * 150ms in / 120ms out / 90ms press, ease-out. `.btn--static` opts out of the press. */
+@layer components {
+  .btn {
+    @apply relative inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3.5 text-sm font-medium;
+    height: 36px;
+    transition-property: background-color, border-color, color, transform, opacity;
+    transition-duration: 120ms;
+    transition-timing-function: var(--ease-out);
+  }
+  /* Icon + text: the icon side sits 2px tighter so the label looks centred. */
+  .btn:has(> svg:first-child):not(.btn--icon) {
+    padding-left: calc(theme('spacing[3.5]') - 2px);
+  }
+  .btn:disabled {
+    @apply cursor-not-allowed opacity-45;
+  }
+  /* Small is still a 32px target on desktop (the minimum for a pointer). */
+  .btn--sm {
+    height: 32px;
+    @apply gap-1.5 px-2.5 text-xs;
+  }
+  .btn--icon {
+    @apply px-0;
+    width: 36px;
+  }
+  .btn--sm.btn--icon {
+    width: 32px;
+  }
+  /* Touch screens: controls grow to a 40–44px target instead of overlapping hit boxes.
+   * (After the base sizes, so these win the cascade.) */
+  @media (pointer: coarse) {
+    .btn {
+      height: 44px;
+    }
+    .btn--sm {
+      height: 40px;
+    }
+    .btn--icon {
+      width: 44px;
+    }
+    .btn--sm.btn--icon {
+      width: 40px;
+    }
+  }
+  .btn--primary {
+    background: rgb(var(--c-primary));
+    color: rgb(var(--c-on-primary));
+  }
+  .btn--success {
+    background: rgb(var(--c-success));
+    color: rgb(var(--c-on-accent));
+  }
+  .btn--danger {
+    background: rgb(var(--c-danger));
+    color: #fff;
+  }
+  .btn--secondary {
+    @apply border border-border bg-panel text-text;
+  }
+  .btn--ghost {
+    @apply text-muted;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .btn:not(:disabled):hover {
+      transition-duration: 150ms;
+    }
+    .btn--primary:not(:disabled):hover {
+      background: color-mix(in srgb, rgb(var(--c-primary)) 84%, rgb(var(--c-bg)));
+    }
+    .btn--success:not(:disabled):hover {
+      background: color-mix(in srgb, rgb(var(--c-success)) 86%, rgb(var(--c-text)));
+    }
+    .btn--danger:not(:disabled):hover {
+      background: color-mix(in srgb, rgb(var(--c-danger)) 86%, rgb(var(--c-text)));
+    }
+    .btn--secondary:not(:disabled):hover {
+      @apply bg-panel2;
+      border-color: rgb(var(--c-text) / 0.28);
+    }
+    .btn--ghost:not(:disabled):hover {
+      @apply bg-panel2 text-text;
+    }
+  }
+  /* Press: scale .96 (interruptible — a transition, not a keyframe). */
+  .btn:not(:disabled):not(.btn--static):active {
+    transition-duration: 90ms;
+    transform: scale(0.96);
+  }
+  .btn[aria-pressed='true'],
+  .btn[aria-expanded='true'].btn--ghost,
+  .btn--ghost.is-active {
+    @apply bg-panel2 text-text;
+  }
+
+  /* Quiet inline action (row icons, "清除" links): colour step + press, no box. */
+  .act {
+    @apply inline-flex items-center justify-center gap-1 rounded-md text-muted;
+    transition-property: background-color, color, transform, opacity;
+    transition-duration: 120ms;
+    transition-timing-function: var(--ease-out);
+  }
+  .act:hover {
+    @apply bg-panel2 text-text;
+  }
+  .act:active {
+    transform: scale(0.96);
+  }
+  .act--danger:hover {
+    @apply bg-danger/10 text-danger;
+  }
+  /* Touch: a real 40px target (the row grows a little rather than hit boxes overlapping). */
+  @media (pointer: coarse) {
+    .act {
+      min-height: 40px;
+      min-width: 40px;
+    }
+  }
+
+  /* Small pressable chips / segments / list items that aren't .btn: same press as buttons. */
+  .press {
+    transition-property: background-color, color, opacity, transform;
+    transition-duration: 120ms;
+    transition-timing-function: var(--ease-out);
+  }
+  .press:not(:disabled):active {
+    transition-duration: 90ms;
+    transform: scale(0.96);
+  }
+
+  /* One field look for inputs, textareas and selects. */
+  .field {
+    @apply w-full rounded-lg border border-border bg-panel px-3 py-2 text-sm text-text placeholder:text-muted;
+    transition-property: border-color, box-shadow;
+    transition-duration: 120ms;
+    transition-timing-function: var(--ease-out);
+  }
+  select.field,
+  .field-select {
+    @apply cursor-pointer bg-panel text-text;
+  }
+  @media (pointer: coarse) {
+    .field,
+    .select-sm {
+      font-size: 16px; /* stops iOS zooming into the field */
+    }
+    .field {
+      min-height: 40px;
+    }
+    /* Element-qualified so it outranks the h-8 utility on the element. */
+    :is(select, input).select-sm {
+      height: 40px;
+    }
+  }
+
+  /* Switch: a checkbox drawn as a track + knob (the knob slides via transform). */
+  .switch {
+    @apply relative inline-block h-[18px] w-8 shrink-0 cursor-pointer appearance-none rounded-full bg-border;
+    transition: background-color 150ms var(--ease-out);
+  }
+  .switch::after {
+    content: '';
+    @apply absolute left-[2px] top-[2px] h-[14px] w-[14px] rounded-full bg-panel;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.2);
+    transition: transform 150ms var(--ease-out);
+  }
+  /* The 32×18 track is drawn small; its hit area is 36×32 (40×40 on touch). */
+  .switch::before {
+    content: '';
+    position: absolute;
+    inset: -7px -2px;
+  }
+  @media (pointer: coarse) {
+    .switch::before {
+      inset: -11px -4px;
+    }
+  }
+  .switch:checked {
+    background: rgb(var(--c-primary));
+  }
+  .switch:checked::after {
+    transform: translateX(14px);
+  }
+  /* Dark: a panel-coloured knob is darker than the off track — lift it to muted. */
+  :root[data-theme='dark'] .switch:not(:checked)::after {
+    background: rgb(var(--c-muted));
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) .switch:not(:checked)::after {
+      background: rgb(var(--c-muted));
+    }
+  }
+  .switch:disabled {
+    @apply cursor-not-allowed opacity-50;
+  }
+  .field:hover {
+    border-color: rgb(var(--c-text) / 0.28);
+  }
+  .field:focus,
+  .field:focus-visible {
+    @apply border-accent;
+    outline: none;
+    box-shadow: 0 0 0 3px rgb(var(--c-accent) / 0.18);
+  }
+
+  /* Section label: sentence case, 13px/500, muted — never tracked capitals. */
+  .label {
+    @apply text-xs font-medium text-muted;
+  }
+
+  /* Activity tag chips */
+  .tone {
+    background: rgb(var(--tone-bg));
+    color: rgb(var(--tone-fg));
+  }
+  .tone-sky { --tone-bg: var(--tone-sky); --tone-fg: var(--tone-sky-fg); }
+  .tone-amber { --tone-bg: var(--tone-amber); --tone-fg: var(--tone-amber-fg); }
+  .tone-teal { --tone-bg: var(--tone-teal); --tone-fg: var(--tone-teal-fg); }
+  .tone-green { --tone-bg: var(--tone-green); --tone-fg: var(--tone-green-fg); }
+  .tone-red { --tone-bg: var(--tone-red); --tone-fg: var(--tone-red-fg); }
+  .tone-rose { --tone-bg: var(--tone-rose); --tone-fg: var(--tone-rose-fg); }
+  .tone-accent { --tone-bg: var(--tone-accent); --tone-fg: var(--tone-accent-fg); }
+  .tone-slate { --tone-bg: var(--tone-slate); --tone-fg: var(--tone-slate-fg); }
+  .tone-neutral { --tone-bg: var(--tone-neutral); --tone-fg: var(--tone-neutral-fg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .btn:hover,
+  .btn:active,
+  .act:active,
+  .press:active,
+  [class*='active:scale-']:active,
+  [class*='has-[a:active]:scale-']:has(a:active) {
+    transform: none !important;
+  }
 }
 
 /* Markdown content */
 .prose-chat {
-  @apply text-[15px] leading-relaxed;
+  @apply text-[14px] leading-[1.7];
+  overflow-wrap: anywhere;
+}
+.prose-chat > :first-child {
+  margin-top: 0;
+}
+.prose-chat > :last-child {
+  margin-bottom: 0;
 }
 .prose-chat p {
   @apply my-2;
 }
 .prose-chat pre {
-  @apply my-2 overflow-x-auto rounded-lg bg-panel2 p-3 text-sm font-mono;
+  @apply my-2 max-w-full overflow-x-auto rounded-lg border border-border bg-panel2 p-3 font-mono text-[12.5px] leading-relaxed;
+  overflow-wrap: normal;
+  overscroll-behavior-x: contain;
 }
 .prose-chat code {
-  @apply rounded bg-panel2 px-1 py-0.5 text-sm font-mono;
+  @apply rounded bg-panel2 px-1 py-0.5 font-mono text-[0.88em];
 }
 .prose-chat pre code {
   @apply bg-transparent p-0;
@@ -51,18 +661,413 @@ body {
 .prose-chat ol {
   @apply my-2 list-decimal pl-5;
 }
+.prose-chat li::marker {
+  @apply text-muted;
+}
 .prose-chat a {
-  @apply text-accent underline;
+  @apply text-accent underline decoration-accent/40 underline-offset-2 transition-colors hover:decoration-accent;
 }
 .prose-chat h1,
 .prose-chat h2,
 .prose-chat h3 {
-  @apply mb-1 mt-3 font-semibold;
+  @apply mb-1 mt-4 font-medium;
+}
+.prose-chat blockquote {
+  @apply my-2 border-l-2 border-border pl-3 text-muted;
 }
 .prose-chat table {
-  @apply my-2 border-collapse text-sm;
+  @apply my-2 block max-w-full border-collapse overflow-x-auto text-sm tabular-nums;
+  overflow-wrap: normal;
+  overscroll-behavior-x: contain;
+}
+.prose-chat th {
+  @apply bg-panel2 font-medium;
 }
 .prose-chat th,
 .prose-chat td {
-  @apply border border-border px-2 py-1;
+  @apply border border-border px-2.5 py-1.5;
+}
+.prose-chat hr {
+  @apply my-4 border-border;
+}
+
+/* KaTeX math: slightly larger than body text; long display formulas scroll
+   sideways instead of overflowing the chat bubble. */
+.prose-chat .katex {
+  font-size: 1.08em;
+}
+.prose-chat .katex-display {
+  @apply my-3 overflow-x-auto overflow-y-hidden py-1;
+}
+.prose-chat .katex-display > .katex {
+  font-size: 1.15em;
+}
+.prose-chat .katex-error {
+  @apply font-mono text-sm;
+}
+
+/* History-search jump: briefly ring the message the user clicked through to. */
+@keyframes msg-flash {
+  0%,
+  60% {
+    box-shadow: 0 0 0 2px rgb(var(--c-accent) / 0.7);
+  }
+  100% {
+    box-shadow: 0 0 0 2px rgb(var(--c-accent) / 0);
+  }
+}
+.msg-flash > div {
+  animation: msg-flash 2.4s ease-out;
+}
+::highlight(search-hit) {
+  background-color: rgb(var(--c-accent) / 0.3);
+  color: inherit;
+}
+
+/* Obsidian-style [[wikilinks]] inside notes */
+.prose-chat a.wikilink {
+  @apply cursor-pointer rounded bg-accent/10 px-1 text-accent no-underline hover:bg-accent/20;
+}
+
+/* ── Palette utilities (also in tailwind.config; kept here so they work without a dev restart) ── */
+@layer utilities {
+  .bg-primary { background-color: rgb(var(--c-primary)); }
+  .text-on-primary { color: rgb(var(--c-on-primary)); }
+  .text-primary { color: rgb(var(--c-primary)); }
+  /* Compact scale (same values as tailwind.config fontSize). */
+  .text-xs { font-size: 12px; line-height: 16px; }
+  .text-sm { font-size: 13px; line-height: 20px; }
+}
+
+/* ── Five reviewed palettes (taste-skill + eye comfort) ──
+ * <html data-palette="amber|harbour|sage|slate|terracotta"> × data-theme light/dark/system. */
+/* A 琥珀 — limewash-ochre + warm-black-gold */
+:root[data-palette='amber'] {
+  color-scheme: light;
+  --c-bg: 244 244 242;
+  --c-panel: 253 253 252;
+  --c-panel2: 239 238 235;
+  --c-border: 226 224 220;
+  --c-muted: 93 90 84;
+  --c-text: 36 34 30;
+  --c-accent: 147 88 12;
+  --c-on-accent: 255 255 255;
+  --c-primary: 168 98 12;
+  --c-on-primary: 255 255 255;
+  --c-bronze: 194 118 19;
+  --c-sand: 242 195 122;
+  --c-success: 29 127 67;
+  --c-danger: 194 58 44;
+  --c-warn: 147 88 12;
+  --c-scrim: 36 34 30;
+  --tone-accent: 249 233 206;
+  --tone-accent-fg: 147 88 12;
+}
+:root[data-palette='amber'][data-theme='dark'] {
+  color-scheme: dark;
+  --c-bg: 29 28 26;
+  --c-panel: 38 37 34;
+  --c-panel2: 47 45 42;
+  --c-border: 58 56 52;
+  --c-muted: 170 165 156;
+  --c-text: 235 232 226;
+  --c-accent: 233 189 120;
+  --c-on-accent: 29 28 26;
+  --c-primary: 233 189 120;
+  --c-on-primary: 29 28 26;
+  --c-bronze: 233 189 120;
+  --c-sand: 233 189 120;
+  --c-success: 124 203 148;
+  --c-danger: 240 138 124;
+  --c-warn: 233 189 120;
+  --c-scrim: 0 0 0;
+  --tone-accent: 73 64 49;
+  --tone-accent-fg: 233 189 120;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-palette='amber']:not([data-theme='light']) {
+    color-scheme: dark;
+    --c-bg: 29 28 26;
+    --c-panel: 38 37 34;
+    --c-panel2: 47 45 42;
+    --c-border: 58 56 52;
+    --c-muted: 170 165 156;
+    --c-text: 235 232 226;
+    --c-accent: 233 189 120;
+    --c-on-accent: 29 28 26;
+    --c-primary: 233 189 120;
+    --c-on-primary: 29 28 26;
+    --c-bronze: 233 189 120;
+    --c-sand: 233 189 120;
+    --c-success: 124 203 148;
+    --c-danger: 240 138 124;
+    --c-warn: 233 189 120;
+    --c-scrim: 0 0 0;
+    --tone-accent: 73 64 49;
+    --tone-accent-fg: 233 189 120;
+  }
+}
+/* B 港湾蓝 — linen-harbour + blue-black-cornflower */
+:root[data-palette='harbour'] {
+  color-scheme: light;
+  --c-bg: 243 244 246;
+  --c-panel: 252 252 253;
+  --c-panel2: 236 238 242;
+  --c-border: 223 226 232;
+  --c-muted: 86 96 110;
+  --c-text: 32 38 46;
+  --c-accent: 43 88 120;
+  --c-on-accent: 255 255 255;
+  --c-primary: 44 88 119;
+  --c-on-primary: 255 255 255;
+  --c-bronze: 59 120 163;
+  --c-sand: 169 200 222;
+  --c-success: 31 122 74;
+  --c-danger: 191 59 51;
+  --c-warn: 43 88 120;
+  --c-scrim: 32 38 46;
+  --tone-accent: 223 234 242;
+  --tone-accent-fg: 43 88 120;
+}
+:root[data-palette='harbour'][data-theme='dark'] {
+  color-scheme: dark;
+  --c-bg: 23 27 33;
+  --c-panel: 31 36 44;
+  --c-panel2: 39 45 54;
+  --c-border: 50 57 68;
+  --c-muted: 155 165 179;
+  --c-text: 228 232 238;
+  --c-accent: 143 191 227;
+  --c-on-accent: 23 27 33;
+  --c-primary: 143 191 227;
+  --c-on-primary: 23 27 33;
+  --c-bronze: 143 191 227;
+  --c-sand: 143 191 227;
+  --c-success: 127 204 156;
+  --c-danger: 240 144 138;
+  --c-warn: 143 191 227;
+  --c-scrim: 0 0 0;
+  --tone-accent: 51 64 77;
+  --tone-accent-fg: 143 191 227;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-palette='harbour']:not([data-theme='light']) {
+    color-scheme: dark;
+    --c-bg: 23 27 33;
+    --c-panel: 31 36 44;
+    --c-panel2: 39 45 54;
+    --c-border: 50 57 68;
+    --c-muted: 155 165 179;
+    --c-text: 228 232 238;
+    --c-accent: 143 191 227;
+    --c-on-accent: 23 27 33;
+    --c-primary: 143 191 227;
+    --c-on-primary: 23 27 33;
+    --c-bronze: 143 191 227;
+    --c-sand: 143 191 227;
+    --c-success: 127 204 156;
+    --c-danger: 240 144 138;
+    --c-warn: 143 191 227;
+    --c-scrim: 0 0 0;
+    --tone-accent: 51 64 77;
+    --tone-accent-fg: 143 191 227;
+  }
+}
+/* C 鼠尾草 — clay-pine + green-black-bone / charcoal-room-sage */
+:root[data-palette='sage'] {
+  color-scheme: light;
+  --c-bg: 242 243 240;
+  --c-panel: 252 252 251;
+  --c-panel2: 235 237 232;
+  --c-border: 221 224 218;
+  --c-muted: 90 95 86;
+  --c-text: 34 38 31;
+  --c-accent: 46 91 68;
+  --c-on-accent: 255 255 255;
+  --c-primary: 46 91 68;
+  --c-on-primary: 255 255 255;
+  --c-bronze: 76 138 105;
+  --c-sand: 182 211 194;
+  --c-success: 46 107 68;
+  --c-danger: 185 65 47;
+  --c-warn: 46 91 68;
+  --c-scrim: 34 38 31;
+  --tone-accent: 228 238 231;
+  --tone-accent-fg: 46 91 68;
+}
+:root[data-palette='sage'][data-theme='dark'] {
+  color-scheme: dark;
+  --c-bg: 24 28 26;
+  --c-panel: 32 37 35;
+  --c-panel2: 41 48 45;
+  --c-border: 52 59 56;
+  --c-muted: 160 166 158;
+  --c-text: 227 228 221;
+  --c-accent: 166 205 185;
+  --c-on-accent: 24 28 26;
+  --c-primary: 166 205 185;
+  --c-on-primary: 24 28 26;
+  --c-bronze: 166 205 185;
+  --c-sand: 166 205 185;
+  --c-success: 143 208 168;
+  --c-danger: 236 145 131;
+  --c-warn: 166 205 185;
+  --c-scrim: 0 0 0;
+  --tone-accent: 56 67 62;
+  --tone-accent-fg: 166 205 185;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-palette='sage']:not([data-theme='light']) {
+    color-scheme: dark;
+    --c-bg: 24 28 26;
+    --c-panel: 32 37 35;
+    --c-panel2: 41 48 45;
+    --c-border: 52 59 56;
+    --c-muted: 160 166 158;
+    --c-text: 227 228 221;
+    --c-accent: 166 205 185;
+    --c-on-accent: 24 28 26;
+    --c-primary: 166 205 185;
+    --c-on-primary: 24 28 26;
+    --c-bronze: 166 205 185;
+    --c-sand: 166 205 185;
+    --c-success: 143 208 168;
+    --c-danger: 236 145 131;
+    --c-warn: 166 205 185;
+    --c-scrim: 0 0 0;
+    --tone-accent: 56 67 62;
+    --tone-accent-fg: 166 205 185;
+  }
+}
+/* D 石板青 — cool-white-slate */
+:root[data-palette='slate'] {
+  color-scheme: light;
+  --c-bg: 243 246 247;
+  --c-panel: 252 253 253;
+  --c-panel2: 233 238 240;
+  --c-border: 219 226 229;
+  --c-muted: 85 100 107;
+  --c-text: 30 42 47;
+  --c-accent: 13 107 118;
+  --c-on-accent: 255 255 255;
+  --c-primary: 13 116 128;
+  --c-on-primary: 255 255 255;
+  --c-bronze: 26 143 156;
+  --c-sand: 168 214 219;
+  --c-success: 31 122 74;
+  --c-danger: 191 59 51;
+  --c-warn: 13 107 118;
+  --c-scrim: 30 42 47;
+  --tone-accent: 223 239 241;
+  --tone-accent-fg: 13 107 118;
+}
+:root[data-palette='slate'][data-theme='dark'] {
+  color-scheme: dark;
+  --c-bg: 22 27 29;
+  --c-panel: 30 36 39;
+  --c-panel2: 38 46 50;
+  --c-border: 49 58 62;
+  --c-muted: 153 167 173;
+  --c-text: 226 234 237;
+  --c-accent: 127 200 207;
+  --c-on-accent: 22 27 29;
+  --c-primary: 127 200 207;
+  --c-on-primary: 22 27 29;
+  --c-bronze: 127 200 207;
+  --c-sand: 127 200 207;
+  --c-success: 127 204 156;
+  --c-danger: 240 144 138;
+  --c-warn: 127 200 207;
+  --c-scrim: 0 0 0;
+  --tone-accent: 47 66 69;
+  --tone-accent-fg: 127 200 207;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-palette='slate']:not([data-theme='light']) {
+    color-scheme: dark;
+    --c-bg: 22 27 29;
+    --c-panel: 30 36 39;
+    --c-panel2: 38 46 50;
+    --c-border: 49 58 62;
+    --c-muted: 153 167 173;
+    --c-text: 226 234 237;
+    --c-accent: 127 200 207;
+    --c-on-accent: 22 27 29;
+    --c-primary: 127 200 207;
+    --c-on-primary: 22 27 29;
+    --c-bronze: 127 200 207;
+    --c-sand: 127 200 207;
+    --c-success: 127 204 156;
+    --c-danger: 240 144 138;
+    --c-warn: 127 200 207;
+    --c-scrim: 0 0 0;
+    --tone-accent: 47 66 69;
+    --tone-accent-fg: 127 200 207;
+  }
+}
+/* E 陶土 — flour-terracotta + walnut-tan */
+:root[data-palette='terracotta'] {
+  color-scheme: light;
+  --c-bg: 246 243 238;
+  --c-panel: 254 253 251;
+  --c-panel2: 239 234 226;
+  --c-border: 227 221 211;
+  --c-muted: 102 92 82;
+  --c-text: 43 36 30;
+  --c-accent: 163 71 43;
+  --c-on-accent: 255 255 255;
+  --c-primary: 163 71 43;
+  --c-on-primary: 255 255 255;
+  --c-bronze: 196 97 63;
+  --c-sand: 239 194 174;
+  --c-success: 46 107 68;
+  --c-danger: 179 38 30;
+  --c-warn: 163 71 43;
+  --c-scrim: 43 36 30;
+  --tone-accent: 249 232 224;
+  --tone-accent-fg: 163 71 43;
+}
+:root[data-palette='terracotta'][data-theme='dark'] {
+  color-scheme: dark;
+  --c-bg: 30 27 24;
+  --c-panel: 39 35 31;
+  --c-panel2: 48 43 38;
+  --c-border: 59 53 48;
+  --c-muted: 170 160 149;
+  --c-text: 236 230 222;
+  --c-accent: 238 169 142;
+  --c-on-accent: 30 27 24;
+  --c-primary: 238 169 142;
+  --c-on-primary: 30 27 24;
+  --c-bronze: 238 169 142;
+  --c-sand: 238 169 142;
+  --c-success: 134 201 154;
+  --c-danger: 242 146 138;
+  --c-warn: 238 169 142;
+  --c-scrim: 0 0 0;
+  --tone-accent: 75 59 51;
+  --tone-accent-fg: 238 169 142;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-palette='terracotta']:not([data-theme='light']) {
+    color-scheme: dark;
+    --c-bg: 30 27 24;
+    --c-panel: 39 35 31;
+    --c-panel2: 48 43 38;
+    --c-border: 59 53 48;
+    --c-muted: 170 160 149;
+    --c-text: 236 230 222;
+    --c-accent: 238 169 142;
+    --c-on-accent: 30 27 24;
+    --c-primary: 238 169 142;
+    --c-on-primary: 30 27 24;
+    --c-bronze: 238 169 142;
+    --c-sand: 238 169 142;
+    --c-success: 134 201 154;
+    --c-danger: 242 146 138;
+    --c-warn: 238 169 142;
+    --c-scrim: 0 0 0;
+    --tone-accent: 75 59 51;
+    --tone-accent-fg: 238 169 142;
+  }
 }

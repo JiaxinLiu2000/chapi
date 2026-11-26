@@ -4,6 +4,7 @@ import { settings } from '../../secrets.js';
 import { switchToPrimary } from '../../engine/accounts.js';
 import { connectGoogle } from '../../services/googleAuth.js';
 import { supervisor } from '../../supervisor.js';
+import { emailVerifier } from '../../tools/emailVerify.js';
 
 export async function settingsRoutes(app: FastifyInstance): Promise<void> {
   app.get('/settings', async () => {
@@ -19,6 +20,8 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     await settings.update(parsed.data);
     // Turning cloakbrowser on starts it immediately (no server restart).
     if (parsed.data.enableBrowser === true) void supervisor.ensureBrowserRunning();
+    // Enabling email verification builds the verifier in the background (first build downloads modules).
+    if (parsed.data.emailVerifyEnabled === true) void emailVerifier.prepare();
     // Toggling hidden mode relaunches the browser headless/headed.
     if (
       parsed.data.browserHidden !== undefined &&

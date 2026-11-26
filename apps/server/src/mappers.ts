@@ -3,10 +3,13 @@ import type {
   Approval,
   Artifact,
   Attachment,
+  Automation,
+  AutomationRun,
   Message,
   MemorySummary,
   PendingQuestion,
   PlanTask,
+  Project,
   Session,
   ToolCall,
   WebPage,
@@ -19,6 +22,10 @@ import type {
   ArtifactDTO,
   ArtifactKind,
   AttachmentDTO,
+  AutomationDTO,
+  AutomationRunDTO,
+  AutomationRunStatus,
+  AutomationRunTrigger,
   EffortLevel,
   Language,
   MemorySummaryDTO,
@@ -29,15 +36,22 @@ import type {
   PermissionProfile,
   PlanTaskDTO,
   PlanTaskStatus,
+  ProjectDTO,
+  ScheduleSpec,
   SessionDTO,
   SessionStatus,
+  TitleSource,
   ToolCallDTO,
   ToolCallStatus,
   UsageDTO,
   WebPageDTO,
+  KnowledgeHistoryItem,
+  KnowledgeKind,
   WikiEntryDTO,
   WikiSourceRef,
 } from '@chapi/shared';
+import { KNOWLEDGE_KINDS } from '@chapi/shared';
+import { isUserChromeEnabled } from './services/userChrome.js';
 
 const iso = (d: Date | null): string | null => (d ? d.toISOString() : null);
 const isoReq = (d: Date): string => d.toISOString();
@@ -62,6 +76,7 @@ export function toSessionDTO(s: Session): SessionDTO {
     id: s.id,
     slug: s.slug,
     title: s.title,
+    titleSource: (s.titleSource as TitleSource) ?? 'auto',
     status: s.status as SessionStatus,
     model: s.model,
     subagentModel: s.subagentModel || s.model,
@@ -69,6 +84,8 @@ export function toSessionDTO(s: Session): SessionDTO {
     language: (s.language as Language) ?? 'zh',
     accountMode: (s.accountMode as SessionDTO['accountMode']) ?? 'auto',
     qualityReviewMinutes: s.qualityReviewMinutes ?? 0,
+    qualityModel: s.qualityModel ?? '',
+    userChrome: isUserChromeEnabled(s.id),
     permissionProfile: s.permissionProfile as PermissionProfile,
     usage: sessionUsage(s),
     createdAt: isoReq(s.createdAt),
@@ -130,6 +147,14 @@ export function toPlanTaskDTO(p: PlanTask): PlanTaskDTO {
     ordinal: p.ordinal,
     text: p.text,
     status: p.status as PlanTaskStatus,
+    reason: p.reason ?? null,
+    replacesId: p.replacesId ?? null,
+    startedAt: iso(p.startedAt),
+    endedAt: iso(p.endedAt),
+    locked: p.locked,
+    depth: p.depth,
+    progress: p.progress ?? null,
+    nodeRunId: p.nodeRunId ?? null,
   };
 }
 
@@ -175,6 +200,7 @@ export function toPendingQuestionDTO(q: PendingQuestion): PendingQuestionDTO {
     options: (q.options as unknown as string[] | null) ?? null,
     answer: q.answer,
     status: q.status as PendingQuestionStatus,
+    source: q.source === 'learning' ? 'learning' : 'agent',
     createdAt: isoReq(q.createdAt),
   };
 }
@@ -199,6 +225,17 @@ export function toWikiEntryDTO(w: WikiEntry): WikiEntryDTO {
     bodyMd: w.bodyMd,
     sourceRefs: (w.sourceRefs as unknown as WikiSourceRef[]) ?? [],
     tags: (w.tags as unknown as string[]) ?? [],
+    category: w.category || '未分类',
+    aliases: (w.aliases as unknown as string[] | null) ?? [],
+    relPath: w.relPath ?? '',
+    kind: (KNOWLEDGE_KINDS as readonly string[]).includes(w.kind) ? (w.kind as KnowledgeKind) : 'skill',
+    topics: (w.topics as unknown as string[] | null) ?? [],
+    score: w.score ?? 50,
+    polarity: w.polarity === 'positive' || w.polarity === 'negative' ? w.polarity : '',
+    situation: w.situation ?? '',
+    solution: w.solution ?? '',
+    observedAt: iso(w.observedAt),
+    history: (w.history as unknown as KnowledgeHistoryItem[] | null) ?? [],
     createdAt: isoReq(w.createdAt),
     updatedAt: isoReq(w.updatedAt),
   };
@@ -212,5 +249,66 @@ export function toMemorySummaryDTO(m: MemorySummary): MemorySummaryDTO {
     roundEnd: m.roundEnd,
     summary: m.summary,
     createdAt: isoReq(m.createdAt),
+  };
+}
+
+export function toProjectDTO(
+  p: Project,
+  stats: { sessionCount: number; lastActivityAt: Date | null },
+): ProjectDTO {
+  return {
+    id: p.id,
+    name: p.name,
+    summary: p.summary,
+    summaryAt: iso(p.summaryAt),
+    sessionCount: stats.sessionCount,
+    lastActivityAt: iso(stats.lastActivityAt),
+    sortOrder: p.sortOrder,
+  };
+}
+
+export function toAutomationRunDTO(r: AutomationRun, session: { slug: string } | null): AutomationRunDTO {
+  return {
+    id: r.id,
+    automationId: r.automationId,
+    sessionId: r.sessionId,
+    sessionSlug: session?.slug ?? null,
+    workflowRunId: r.workflowRunId,
+    workflowVersion: r.workflowVersion,
+    trigger: r.trigger as AutomationRunTrigger,
+    status: r.status as AutomationRunStatus,
+    note: r.note,
+    dueAt: iso(r.dueAt),
+    startedAt: isoReq(r.startedAt),
+    endedAt: iso(r.endedAt),
+  };
+}
+
+export function toAutomationDTO(
+  a: Automation,
+  extra: {
+    workflow: { slug: string; name: string; confirmed: boolean } | null;
+    lastRun: AutomationRunDTO | null;
+    openRuns: AutomationRunDTO[];
+  },
+): AutomationDTO {
+  return {
+    id: a.id,
+    name: a.name,
+    workflowSlug: extra.workflow?.slug ?? null,
+    workflowName: extra.workflow?.name ?? null,
+    workflowConfirmed: extra.workflow?.confirmed ?? false,
+    prompt: a.prompt,
+    schedule: a.schedule as unknown as ScheduleSpec,
+    mode: a.mode === 'auto' ? 'auto' : 'manual',
+    enabled: a.enabled,
+    model: a.model,
+    effort: a.effort,
+    inputs: (a.inputs as Record<string, string> | null) ?? null,
+    projectId: a.projectId,
+    nextRunAt: iso(a.nextRunAt),
+    autoSince: iso(a.autoSince),
+    lastRun: extra.lastRun,
+    openRuns: extra.openRuns,
   };
 }

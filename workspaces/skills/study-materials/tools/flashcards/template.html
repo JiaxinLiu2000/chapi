@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CS6140 Midterm Flashcards</title>
+<style>/*KATEX_CSS*/</style>
+<style>
+.katex{font-size:1.05em}
+.qtext .katex{font-size:1em}
+:root{
+  --bg:#f6f7fb; --panel:#ffffff; --ink:#1d2433; --muted:#667085; --line:#e3e6ee;
+  --accent:#4255ff; --accent-ink:#ffffff; --chip:#eef0fb; --know:#16a34a; --learn:#ea580c;
+  --quiz:#b42318; --quiz-bg:#fde8e7; --key:#8a5a00; --key-bg:#fff4d6; --shadow:0 6px 24px rgba(20,30,60,.10);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1320; --panel:#181d2d; --ink:#e7eaf3; --muted:#9aa3b8; --line:#2a3147;
+    --accent:#7b8bff; --accent-ink:#0f1320; --chip:#232a40; --quiz:#ff8b80; --quiz-bg:#3a1f22; --key:#ffcc66; --key-bg:#3a3020;
+    --shadow:0 6px 24px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1320; --panel:#181d2d; --ink:#e7eaf3; --muted:#9aa3b8; --line:#2a3147;
+  --accent:#7b8bff; --accent-ink:#0f1320; --chip:#232a40; --quiz:#ff8b80; --quiz-bg:#3a1f22; --key:#ffcc66; --key-bg:#3a3020;
+  --shadow:0 6px 24px rgba(0,0,0,.4);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"PingFang SC","Microsoft YaHei",sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:16px}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between}
+h1{font-size:20px;margin:0}
+.sub{color:var(--muted);font-size:13px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;padding:7px 12px}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:12px 0}
+.chip{border-radius:999px;padding:4px 11px;font-size:13px;background:var(--chip);border-color:transparent}
+.chip.on{background:var(--accent);color:var(--accent-ink)}
+.chip.calc{background:var(--key-bg);color:var(--key);font-weight:700}
+.chip.calc.on{background:var(--key);color:var(--panel)}
+.qtext.calcq{font-size:18px;font-weight:500}
+.sollabel{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--key);margin:2px 0 2px}
+.figimg{display:block;max-width:100%;max-height:300px;margin:6px auto 10px;border-radius:8px;border:1px solid var(--line);background:#fff;object-fit:contain}
+.figimg.big{max-height:420px}
+.item .figimg{cursor:zoom-in}
+.zoombtn{font-size:12px;padding:3px 10px;margin:-4px 0 6px;border-radius:999px}
+#lightbox{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:50;cursor:zoom-out;padding:12px}
+#lightbox[hidden]{display:none}
+#lightbox img{max-width:100%;max-height:100%;background:#fff;border-radius:6px}
+.figimg.small{max-height:170px}
+.item .figimg{max-height:340px}
+.calcintro{background:var(--key-bg);color:var(--ink);border-radius:12px;padding:10px 14px;font-size:14px;margin:6px 0 0}
+.chip small{opacity:.75;margin-left:3px}
+input[type=search]{font:inherit;flex:1;min-width:180px;padding:7px 11px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+label.tog{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:4px;user-select:none}
+.progress{height:6px;background:var(--line);border-radius:6px;overflow:hidden;margin:6px 0 2px}
+.progress>div{height:100%;background:var(--accent);width:0}
+.stats{display:flex;gap:14px;font-size:13px;color:var(--muted);flex-wrap:wrap}
+.stats b.k{color:var(--know)} .stats b.l{color:var(--learn)}
+/* flashcard */
+.stage{perspective:1600px;margin:14px 0}
+.card{position:relative;width:100%;min-height:560px;transition:transform .45s;transform-style:preserve-3d;cursor:pointer}
+.card.flipped{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:22px 26px;display:flex;flex-direction:column;overflow:auto}
+.back{transform:rotateY(180deg)}
+.meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;color:var(--muted);margin-bottom:10px}
+.tag{padding:2px 8px;border-radius:999px;background:var(--chip);font-weight:600}
+.badge{padding:2px 8px;border-radius:999px;font-weight:700}
+.badge.q{background:var(--quiz-bg);color:var(--quiz)} .badge.k{background:var(--key-bg);color:var(--key)}
+.badge.mk{background:transparent;border:1px solid currentColor}
+.qtext{font-size:22px;font-weight:600;margin:auto 0;line-height:1.4}
+.hint{font-size:12px;color:var(--muted);text-align:center;margin-top:12px}
+.ans ul{margin:4px 0 8px;padding-left:20px}
+.ans li{margin:5px 0}
+.zh{margin-top:auto;padding-top:10px;border-top:1px dashed var(--line);font-size:14px;color:var(--muted)}
+.src{font-size:12px;color:var(--muted);margin-top:4px}
+.controls{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}
+.controls .know{border-color:var(--know);color:var(--know)} .controls .learn{border-color:var(--learn);color:var(--learn)}
+.counter{text-align:center;color:var(--muted);font-size:14px;margin:6px 0}
+.keys{text-align:center;font-size:12px;color:var(--muted);margin-top:10px}
+kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:0 5px;font-size:11px;background:var(--panel)}
+/* list */
+.item{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 18px;margin:10px 0}
+.item .q{font-weight:600}
+.item details summary{cursor:pointer;color:var(--accent);font-size:14px;margin-top:6px}
+.item .ans{margin-top:6px}
+.sec{margin:22px 0 6px;font-size:17px;border-bottom:2px solid var(--line);padding-bottom:4px}
+.empty{padding:40px;text-align:center;color:var(--muted)}
+.exambar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0}
+@media (max-width:600px){
+  .wrap{padding:16px}
+  .face{padding:18px}
+  .qtext{font-size:19px}
+  .card{min-height:600px}
+  .figimg.big{max-height:300px}
+}
+@media print{
+  header .tabs,.bar,.controls,.keys,.exambar button,.progress,.stats,#themeBtn{display:none!important}
+  body{background:#fff;color:#000;font-size:11pt}
+  .item{break-inside:avoid;border:1px solid #bbb;box-shadow:none;margin:6px 0;padding:8px 12px}
+  .item details{display:block}
+  .item details>summary{display:none}
+  .item details:not([open]) > .ans{display:block}
+  .sec{break-after:avoid}
+  .figimg,.item .figimg{max-width:70%;max-height:260px;border:none}
+  .calcintro{display:none!important}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>CS6140 Midterm Flashcards</h1>
+      <div class="sub">Exam: Nov 12, 2026, 3–6 PM · pen &amp; paper · conceptual + short answer · W2–W12 (through NLP)</div>
+    </div>
+    <div class="tabs">
+      <button id="tabCards" class="on">Flashcards</button>
+      <button id="tabDeep">Deep understanding</button>
+      <button id="tabCalc">Calc problems</button>
+      <button id="tabFig">Slide figures</button>
+      <button id="tabList">List / Print</button>
+      <button id="tabExam">Practice exam</button>
+      <button id="themeBtn" title="Toggle light/dark">◐</button>
+    </div>
+  </header>
+
+  <div class="bar" id="lecBar"></div>
+  <div class="bar">
+    <input type="search" id="search" placeholder="Search questions, answers, 中文…">
+    <label class="tog"><input type="checkbox" id="fQuiz"> Past quiz only</label>
+    <label class="tog"><input type="checkbox" id="fKey"> Key topics only</label>
+    <label class="tog"><input type="checkbox" id="fLearn"> Still learning only</label>
+  </div>
+  <div class="progress"><div id="prog"></div></div>
+  <div class="stats" id="stats"></div>
+
+  <section id="viewCards">
+    <div class="calcintro" id="calcIntro" hidden>Calculation practice — cross-chapter problems that are easy to do by hand (classic textbook / online examples: Play-Tennis naive Bayes &amp; ID3, the medical-test Bayes problem, "I am Sam" bigrams, k-means &amp; DBSCAN by hand…). Try each on paper first; the back shows a step-by-step solution. Use "List / Print" to print them with solutions.</div>
+    <div class="calcintro" id="deepIntro" hidden>Deep understanding — the exam is reported to be abstract: you must reason, not look things up. These questions ask <b>why</b>, <b>what happens if…</b>, <b>diagnose this situation</b>, and <b>connect ideas across lectures</b>. Answer out loud or on paper in 3–4 sentences before flipping; the back gives the key insight and the reasoning.</div>
+    <div class="calcintro" id="figIntro" hidden>Slide figures — the classic diagrams and plots from the lecture slides (W2, W4–W12). Look at the figure, explain what it shows the way the quizzes ask ("explain this function's use and interpret each marked region"), then flip for the key points. Source page numbers point to the original PDFs.</div>
+    <div class="stage"><div class="card" id="card">
+      <div class="face front" id="front"></div>
+      <div class="face back" id="back"></div>
+    </div></div>
+    <div class="counter" id="counter"></div>
+    <div class="controls">
+      <button id="prevBtn">← Prev</button>
+      <button id="flipBtn" class="primary">Flip</button>
+      <button id="nextBtn">Next →</button>
+    </div>
+    <div class="controls" style="margin-top:8px">
+      <button class="learn" id="learnBtn">Still learning</button>
+      <button class="know" id="knowBtn">I know it ✓</button>
+      <button id="shuffleBtn">Shuffle</button>
+      <button id="resetBtn" title="Clear all know / still-learning marks">Reset marks</button>
+    </div>
+    <div class="keys"><kbd>Space</kbd> flip · <kbd>←</kbd>/<kbd>→</kbd> prev/next · <kbd>K</kbd> know · <kbd>L</kbd> still learning · <kbd>S</kbd> shuffle</div>
+  </section>
+
+  <section id="viewList" hidden></section>
+  <div id="lightbox" hidden><img alt="enlarged figure"></div>
+
+  <section id="viewExam" hidden>
+    <div class="exambar">
+      <span class="sub">25 random questions from the current filter (≈ 1.5 h exam pace: ~3–4 min each). Write your answers on paper, then reveal. Select the "Calc practice" chip first for a calculation-only set.</span>
+      <button class="primary" id="newExam">New practice exam</button>
+      <button id="revealAll">Reveal all answers</button>
+    </div>
+    <div id="examBody"></div>
+  </section>
+</div>
+
+<script>/*KATEX_JS*/</script>
+<script>
+const CARDS = [];
+// typeset \( ... \) formulas with the embedded KaTeX (works offline); harmless if KaTeX failed to load
+function typeset(el){
+  try { if (window.renderMathInElement) renderMathInElement(el, {delimiters: [{left: "\\(", right: "\\)", display: false}], throwOnError: false}); }
+  catch(e){ console.warn("typeset failed", e); }
+}
+function c(l, t, q, a, zh, s, f, img){ return {l, t, q, a, zh, s, quiz:(f||"").includes("Q"), key:(f||"").includes("K"), imgsF: img ? [img] : [], imgsB: []}; }
+/*IMGS*/
+/*CARDS*/
+// figures attached to concept / calc cards: [question substring, image key, side F=front (part of the question) | B=back (with the answer)]
+const IMG_MAP = [
+ ["Show the components of Bayes","W2p25","B"],["Name the four moments","W2p7","B"],["What does a z-score tell you","W2p28","B"],["Eigendecomposition vs. SVD","W2p47","B"],
+ ["Can we use linear regression to model a binary","W4p55","B"],["What happens if the learning rate is too large","W4p17","B"],["Define overfitting","W4p31","B"],
+ ["In the sin(2.5πx) example","W4p37","B"],["Write the ridge objective","W4p44","B"],["Name 2 differences between L1","W4p46","B"],["Describe the steps of logistic regression","W4p61","B"],
+ ["How do bias and variance change","W5p6","B"],["Explain bias vs. variance with the bullseye","W5p5","B"],["What are the roles of training, validation","W5p10","B"],
+ ["How does k-nearest neighbors make a prediction","W6p7","B"],["What does an SVM try to find","W6p17","B"],["Explain the hinge function's use in SVM","W6p20","F"],
+ ["Describe the k-means algorithm","W7p16","B"],["How can you choose k for k-means","W7p23","B"],["Single vs. complete vs. centroid linkage","W7p30","B"],["What is a dendrogram","W7p32","B"],
+ ["Define ε-neighborhood","W7p35","B"],["When would you prefer DBSCAN","W7p34","B"],["What is the purpose of a scree plot","W7p42","B"],["What is factor analysis used for","W7p37","B"],
+ ["Write the Gini index","W8p17","B"],["Why can a regression tree fit non-linear","W8p7","B"],["How does a random forest classifier work","W8p21","B"],
+ ["Sequential vs. parallel ensembles","W9p5","B"],["Outline the AdaBoost algorithm","W9p11","B"],["What are out-of-bag (OOB)","W9p16","B"],["What is stacking?","W9p19","B"],
+ ["Explain matrix factorization","W10p9","B"],["What is the problem with using the dot product","W10p19","B"],["How does bag of words represent","W10p22","B"],["Skip-gram vs. CBOW","W10p36","B"],
+ ["What is GloVe's objective","W10p38","B"],["In GloVe, why might dot product","W10p43","B"],
+ ["What is the role of the bias term in a perceptron","W11p6","B"],["Why are non-linear activation functions needed","W11p8","B"],["Describe the common activation functions","W11p9","B"],
+ ["Which activation function should be used where","W11p10","B"],["How is a multilayer perceptron trained","W11p12","B"],["What does a loss curve show","W11p14","B"],["What is dropout","W11p17","B"],
+ ["What are vanishing and exploding gradients","W11p22","B"],["Batch vs. mini-batch vs. stochastic","W11p23","B"],["Discriminative vs. generative models","W11p24","B"],
+ ["What are the key components of a CNN","W11p25","B"],["What is an RNN","W11p26","B"],["What is an autoencoder","W11p27","B"],["What is a Transformer (at a high level)","W11p28","B"],["How does a GAN work","W11p29","B"],
+ ["Why is NLP hard?","W12p6","B"],["Stemming vs. lemmatization","W12p10","B"],["What does LDA do?","W12p12","B"],["What are word embeddings and how do they improve","W12p16","B"],["BERT vs. GPT vs. BART","W12p19","B"],
+ ["Classic medical test","calc_bayes_tree","B"],["Fit simple linear regression by hand","calc_linreg_data","F"],["Fit simple linear regression by hand","calc_linreg_fit","B"],
+ ["Minimize f(x) = 3x²","calc_gd","B"],["Pass/fail model","calc_logistic","B"],["A classifier on 100 patients","calc_confusion","F"],["Scores and labels: 0.9(+)","calc_roc","B"],
+ ["Errors (y − ŷ) on 5 points","calc_outlier","B"],["Training points: A(1,1) red","calc_knn","F"],["For a soft-margin SVM, hinge loss","calc_hinge","B"],["Run k-means (k = 2)","calc_kmeans","B"],
+ ["Agglomerative clustering on 1-D points","calc_dendro","B"],["1-D points: 1, 2, 3, 6, 10","calc_dbscan","B"],["Play-Tennis root node","calc_tennis_split","B"],["x = 1, 2, 3, 4 and y = 1, 2, 10, 12","calc_regtree","B"],
+ ["AdaBoost on 5 instances","calc_adaboost","B"],["Five independent classifiers","calc_vote","B"],["(a) Euclidean and Manhattan","calc_dist","B"],["(a) Euclidean and Manhattan","calc_venn","B"],
+ ["Network: inputs x = (2, 1)","calc_nn","F"],["Output scores (logits)","calc_softmax","B"],["The sigmoid derivative is at most 0.25","calc_vanish","B"],["A 28×28×1 MNIST image","calc_cnn","B"],
+ ["Two standardized features have correlation","calc_pca","F"],["When drawing a bootstrap sample","calc_oob","B"],["Corpus: <s> I am Sam","calc_bigram","B"],["Embeddings (3-D): cat","calc_embed","F"],
+ ["User wants features [educational","calc_cosine","B"],
+ ["Why does L1 produce exactly-zero weights","W4p46","B"],["Model A: training error 2%, test error 25%","W5p6","B"],["Give two datasets on which k-means fails","W7p34","B"],
+ ["Why is dropout often described as training an ensemble","W11p17","B"],["Training loss keeps decreasing but validation loss started increasing","W11p14","B"],
+ ["Why are RNNs especially prone to vanishing","W11p26","B"],["Why is GPT natural for text generation","W12p19","B"],["You delete a training point that is far from the SVM boundary","W6p17","B"],
+ ["Why does gradient descent converge slowly when one feature","W4p25","B"],
+];
+IMG_MAP.forEach(([sub, key, side]) => {
+  const card = CARDS.find(x => x.l !== "Fig" && x.q.includes(sub));
+  if (!card || !IMGS[key]) { console.warn("IMG_MAP unmatched:", sub, key); return; }
+  (side === "F" ? card.imgsF : card.imgsB).push(key);
+});
+CARDS.forEach((x, i) => { x.id = x.l + "-" + i; });
+
+const LECS = ["General","W2","W4","W5","W6","W7","W8","W9","W10","W11","W12","Synthesis","Deep","Calc","Fig"];
+const LEC_NAME = {General:"General",W2:"W2 Math",W4:"W4 Regression",W5:"W5 Evaluation",W6:"W6 Supervised",W7:"W7 Unsupervised",
+  W8:"W8 Trees",W9:"W9 Ensemble",W10:"W10 RecSys",W11:"W11 Deep Learning",W12:"W12 NLP",Synthesis:"Cross-topic",Deep:"Deep understanding",Calc:"Calc practice",Fig:"Slide figures"};
+const SPECIAL = ["Deep","Calc","Fig"];   // separate sections, not part of "All concepts"
+const onlySection = s => state.lecs.size === 1 && state.lecs.has(s);
+const isCalcOnly = () => onlySection("Calc");
+
+// ---- storage (per-viewer convenience only; must work without it) ----
+const STORE_KEY = "cs6140-marks-v1";
+function load(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } }
+function save(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+let marks = load(STORE_KEY, {});            // id -> "k" | "l"
+let theme = load("cs6140-theme", "");
+if (theme) document.documentElement.dataset.theme = theme;
+
+const state = { lecs: new Set(), q:"", quiz:false, key:false, learn:false, order:[], pos:0, view:"cards" };
+
+function esc(s){ return s.replace(/[&<>]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[ch])); }
+function plain(h){ return h.replace(/<[^>]+>/g, " "); }
+function filtered(){
+  const q = state.q.trim().toLowerCase();
+  return CARDS.filter(x =>
+    (state.lecs.size === 0 ? !SPECIAL.includes(x.l) : state.lecs.has(x.l)) &&
+    (!state.quiz || x.quiz) && (!state.key || x.key || x.quiz) &&
+    (!state.learn || marks[x.id] !== "k") &&
+    (!q || (x.q + " " + plain(x.a.join(" ")) + " " + x.zh + " " + x.t).toLowerCase().includes(q)));
+}
+function badges(x){
+  let b = "";
+  if (x.quiz) b += '<span class="badge q">Past quiz</span>';
+  if (x.key) b += '<span class="badge k">Key</span>';
+  if (marks[x.id] === "k") b += '<span class="badge mk" style="color:var(--know)">known</span>';
+  if (marks[x.id] === "l") b += '<span class="badge mk" style="color:var(--learn)">learning</span>';
+  return b;
+}
+function imgsHTML(keys, cls){
+  return keys.filter(k => IMGS[k]).map(k => '<img class="' + cls + '" src="' + IMGS[k] + '" alt="' + k + '">').join("");
+}
+function ansHTML(x){
+  return imgsHTML(x.imgsB, "figimg") + '<div class="ans"><ul>' + x.a.map(li => "<li>" + li + "</li>").join("") + "</ul></div>" +
+         '<div class="zh">中文要点：' + esc(x.zh) + '</div><div class="src">Source: ' + esc(x.s) + "</div>";
+}
+
+// ---- lecture chips ----
+function renderChips(){
+  const bar = document.getElementById("lecBar");
+  const all = document.createElement("button");
+  all.className = "chip" + (state.lecs.size === 0 ? " on" : "");
+  all.innerHTML = 'All concepts<small>' + CARDS.filter(x => !SPECIAL.includes(x.l)).length + '</small>';
+  all.onclick = () => { state.lecs.clear(); refresh(true); };
+  bar.replaceChildren(all);
+  LECS.forEach(l => {
+    const n = CARDS.filter(x => x.l === l).length;
+    if (!n) return;
+    const b = document.createElement("button");
+    b.className = "chip" + (SPECIAL.includes(l) ? " calc" : "") + (state.lecs.has(l) ? " on" : "");
+    b.innerHTML = LEC_NAME[l] + "<small>" + n + "</small>";
+    b.onclick = () => { state.lecs.has(l) ? state.lecs.delete(l) : state.lecs.add(l); refresh(true); };
+    bar.appendChild(b);
+  });
+}
+function renderStats(list){
+  const k = list.filter(x => marks[x.id] === "k").length, l = list.filter(x => marks[x.id] === "l").length;
+  document.getElementById("stats").innerHTML =
+    "<span>" + list.length + " cards in view</span><span><b class='k'>" + k + "</b> known</span><span><b class='l'>" + l +
+    "</b> still learning</span><span>" + (list.length - k - l) + " not reviewed</span>";
+  document.getElementById("prog").style.width = (list.length ? (100 * k / list.length) : 0) + "%";
+}
+
+// ---- flashcards ----
+function rebuildOrder(shuffle){
+  const ids = filtered().map(x => x.id);
+  if (shuffle) for (let i = ids.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
+  state.order = ids; state.pos = 0;
+}
+function current(){ const id = state.order[state.pos]; return CARDS.find(x => x.id === id); }
+function renderCard(){
+  const card = document.getElementById("card"); card.classList.remove("flipped");
+  const x = current(), front = document.getElementById("front"), back = document.getElementById("back");
+  if (!x){ front.innerHTML = '<div class="empty">No cards match the current filter.</div>'; back.innerHTML = ""; document.getElementById("counter").textContent = ""; return; }
+  const meta = '<div class="meta"><span class="tag">' + LEC_NAME[x.l] + '</span><span>' + esc(x.t) + '</span>' + badges(x) + "</div>";
+  const calc = x.l === "Calc", fig = x.l === "Fig", deep = x.l === "Deep", hasF = x.imgsF.length > 0;
+  const zoom = '<div style="text-align:center"><button class="zoombtn" type="button">Enlarge figure ⤢</button></div>';
+  front.innerHTML = meta + imgsHTML(x.imgsF, fig ? "figimg big" : "figimg") + (hasF ? zoom : "") +
+    '<div class="qtext' + (calc || hasF ? ' calcq' : '') + '">' + esc(x.q) + '</div><div class="hint">' +
+    (calc ? 'Work it out on paper, then click / Space for the step-by-step solution' : deep ? 'Reason it out in 3–4 sentences, then click / Space' : fig ? 'Study the figure, answer, then click / Space for the key points' : 'Click / Space to see the answer') + '</div>';
+  back.innerHTML = meta + '<div style="font-weight:600;margin-bottom:6px">' + esc(x.q) + "</div>" + imgsHTML(x.imgsF, "figimg small") +
+    (calc ? '<div class="sollabel">Step-by-step solution</div>' : fig ? '<div class="sollabel">What to know</div>' : deep ? '<div class="sollabel">Key insight &amp; reasoning</div>' : '') + ansHTML(x);
+  typeset(front); typeset(back);
+  document.getElementById("counter").textContent = (state.pos + 1) + " / " + state.order.length;
+}
+function flip(){ document.getElementById("card").classList.toggle("flipped"); }
+function move(d){ if (!state.order.length) return; state.pos = (state.pos + d + state.order.length) % state.order.length; renderCard(); }
+function mark(v){
+  const x = current(); if (!x) return;
+  marks[x.id] = v; save(STORE_KEY, marks);
+  renderStats(filtered());
+  if (state.learn && v === "k"){ state.order.splice(state.pos, 1); if (state.pos >= state.order.length) state.pos = 0; renderCard(); }
+  else move(1);
+}
+
+// ---- list ----
+function renderList(){
+  const list = filtered(), el = document.getElementById("viewList");
+  if (!list.length){ el.innerHTML = '<div class="empty">No cards match the current filter.</div>'; return; }
+  let html = '<div class="exambar"><span class="sub">Tip: use your browser\'s Print (Ctrl/Cmd+P) on this view — answers are expanded automatically for the paper copy.</span>' +
+             '<button id="expandAll">Expand all</button><button id="collapseAll">Collapse all</button></div>';
+  LECS.forEach(l => {
+    const part = list.filter(x => x.l === l); if (!part.length) return;
+    html += '<h2 class="sec">' + LEC_NAME[l] + " · " + part.length + "</h2>";
+    part.forEach((x, i) => {
+      html += '<div class="item"><div class="meta"><span class="tag">' + esc(x.t) + "</span>" + badges(x) + '</div>' + imgsHTML(x.imgsF, "figimg") + '<div class="q">' + (i + 1) + ". " + esc(x.q) +
+              "</div><details><summary>Show answer</summary>" + ansHTML(x) + "</details></div>";
+    });
+  });
+  el.innerHTML = html;
+  typeset(el);
+  document.getElementById("expandAll").onclick = () => el.querySelectorAll("details").forEach(d => d.open = true);
+  document.getElementById("collapseAll").onclick = () => el.querySelectorAll("details").forEach(d => d.open = false);
+}
+
+// ---- practice exam ----
+let exam = [];
+function newExam(){
+  const pool = filtered().slice();
+  for (let i = pool.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+  exam = pool.slice(0, 25); renderExam();
+}
+function renderExam(){
+  const el = document.getElementById("examBody");
+  if (!exam.length){ el.innerHTML = '<div class="empty">Click “New practice exam”.</div>'; return; }
+  el.innerHTML = exam.map((x, i) => '<div class="item"><div class="meta"><span class="tag">' + LEC_NAME[x.l] + "</span><span>" + esc(x.t) + "</span>" + badges(x) +
+    '</div>' + imgsHTML(x.imgsF, "figimg") + '<div class="q">Q' + (i + 1) + ". " + esc(x.q) + "</div><details><summary>Reveal answer</summary>" + ansHTML(x) + "</details></div>").join("");
+  typeset(el);
+}
+
+// ---- wiring ----
+function setView(v){
+  state.view = v;
+  ["Cards","List","Exam"].forEach(n => { document.getElementById("view" + n).hidden = (v !== n.toLowerCase()); document.getElementById("tab" + n).classList.toggle("on", v === n.toLowerCase()); });
+  syncCalcUI();
+  if (v === "list") renderList();
+  if (v === "exam" && !exam.length) newExam();
+}
+function syncCalcUI(){
+  const calc = isCalcOnly(), fig = onlySection("Fig"), deep = onlySection("Deep");
+  document.getElementById("calcIntro").hidden = !calc;
+  document.getElementById("figIntro").hidden = !fig;
+  document.getElementById("deepIntro").hidden = !deep;
+  document.getElementById("tabCalc").classList.toggle("on", calc && state.view === "cards");
+  document.getElementById("tabFig").classList.toggle("on", fig && state.view === "cards");
+  document.getElementById("tabDeep").classList.toggle("on", deep && state.view === "cards");
+  if ((calc || fig || deep) && state.view === "cards") document.getElementById("tabCards").classList.remove("on");
+}
+function refresh(reorder){
+  renderChips(); syncCalcUI(); const list = filtered(); renderStats(list);
+  if (reorder) rebuildOrder(false);
+  renderCard();
+  if (state.view === "list") renderList();
+}
+document.getElementById("tabCards").onclick = () => { if (SPECIAL.some(onlySection)) state.lecs.clear(); setView("cards"); refresh(true); };
+document.getElementById("tabDeep").onclick = () => { state.lecs = new Set(["Deep"]); setView("cards"); refresh(true); };
+document.getElementById("tabCalc").onclick = () => { state.lecs = new Set(["Calc"]); setView("cards"); refresh(true); };
+document.getElementById("tabFig").onclick = () => { state.lecs = new Set(["Fig"]); setView("cards"); refresh(true); };
+document.getElementById("tabList").onclick = () => setView("list");
+document.getElementById("tabExam").onclick = () => setView("exam");
+// lightbox: in the flashcard, a click flips the card and the "Enlarge figure" button zooms;
+// in List / Practice exam views, clicking a figure zooms. Click the overlay or press Esc to close.
+const lb = document.getElementById("lightbox");
+function openLB(src){ lb.querySelector("img").src = src; lb.hidden = false; }
+document.getElementById("card").onclick = e => {
+  if (e.target.classList.contains("zoombtn")){ const img = e.target.closest(".face").querySelector(".figimg"); if (img) openLB(img.src); return; }
+  flip();
+};
+document.addEventListener("click", e => {
+  if (!lb.hidden && lb.contains(e.target)){ lb.hidden = true; return; }
+  if (e.target.classList && e.target.classList.contains("figimg") && !e.target.closest("#card")) openLB(e.target.src);
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape") lb.hidden = true; });
+document.getElementById("flipBtn").onclick = flip;
+document.getElementById("prevBtn").onclick = () => move(-1);
+document.getElementById("nextBtn").onclick = () => move(1);
+document.getElementById("knowBtn").onclick = () => mark("k");
+document.getElementById("learnBtn").onclick = () => mark("l");
+document.getElementById("shuffleBtn").onclick = () => { rebuildOrder(true); renderCard(); };
+document.getElementById("resetBtn").onclick = () => { if (confirm("Clear all know / still-learning marks?")){ marks = {}; save(STORE_KEY, marks); refresh(true); } };
+document.getElementById("newExam").onclick = newExam;
+document.getElementById("revealAll").onclick = () => document.querySelectorAll("#examBody details").forEach(d => d.open = true);
+document.getElementById("search").oninput = e => { state.q = e.target.value; refresh(true); };
+document.getElementById("fQuiz").onchange = e => { state.quiz = e.target.checked; refresh(true); };
+document.getElementById("fKey").onchange = e => { state.key = e.target.checked; refresh(true); };
+document.getElementById("fLearn").onchange = e => { state.learn = e.target.checked; refresh(true); };
+document.getElementById("themeBtn").onclick = () => {
+  const dark = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() === "#0f1320";
+  theme = dark ? "light" : "dark"; document.documentElement.dataset.theme = theme; save("cs6140-theme", theme);
+};
+document.addEventListener("keydown", e => {
+  if (state.view !== "cards" || e.target.tagName === "INPUT") return;
+  if (e.code === "Space"){ e.preventDefault(); flip(); }
+  else if (e.key === "ArrowRight") move(1);
+  else if (e.key === "ArrowLeft") move(-1);
+  else if (e.key === "k" || e.key === "K") mark("k");
+  else if (e.key === "l" || e.key === "L") mark("l");
+  else if (e.key === "s" || e.key === "S"){ rebuildOrder(true); renderCard(); }
+});
+refresh(true);
+</script>
+</body>
+</html>

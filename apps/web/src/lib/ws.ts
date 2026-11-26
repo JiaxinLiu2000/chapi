@@ -101,3 +101,34 @@ export function getSocket(): ChapiSocket {
   }
   return singleton;
 }
+
+/**
+ * Board live updates: `board.changed` touches every board view at once (~400ms
+ * coalescing); session-level global events (created / renamed / asking for you)
+ * only move cards on "today", so they're debounced to one trailing call ~1.5s
+ * after the burst ends.
+ */
+export function watchBoard(onChange: (scope: 'all' | 'today') => void): () => void {
+  let allTimer: ReturnType<typeof setTimeout> | null = null;
+  let todayTimer: ReturnType<typeof setTimeout> | null = null;
+  const off = getSocket().on((e) => {
+    if (e.type === 'board.changed') {
+      if (allTimer) return;
+      allTimer = setTimeout(() => {
+        allTimer = null;
+        onChange('all');
+      }, 400);
+    } else if (e.type === 'session.created' || e.type === 'session.updated' || e.type === 'session.attention') {
+      if (todayTimer) clearTimeout(todayTimer);
+      todayTimer = setTimeout(() => {
+        todayTimer = null;
+        onChange('today');
+      }, 1500);
+    }
+  });
+  return () => {
+    off();
+    if (allTimer) clearTimeout(allTimer);
+    if (todayTimer) clearTimeout(todayTimer);
+  };
+}

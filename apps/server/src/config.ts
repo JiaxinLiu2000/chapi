@@ -18,8 +18,8 @@ const envSchema = z.object({
   DATABASE_URL: z.string().default('mysql://chapi:chapi@127.0.0.1:3307/chapi'),
   SECRETS_KEY: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
-  MAIN_MODEL: z.string().default('claude-sonnet-4-6'),
-  SUBAGENT_MODEL: z.string().default('claude-sonnet-4-6'),
+  MAIN_MODEL: z.string().default('claude-opus-5-5'),
+  SUBAGENT_MODEL: z.string().default('claude-sonnet-5-5'),
   OPENAI_API_KEY: z.string().optional(),
   EMBEDDING_MODEL: z.string().default('text-embedding-3-small'),
   WORKSPACES_DIR: z.string().default('./workspaces'),
@@ -30,6 +30,10 @@ const envSchema = z.object({
   GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
   GOOGLE_USER_EMAIL: z.string().optional(),
+  GMAIL_DRAFT_EMAIL: z.string().optional(),
+  GMAIL_READONLY_EMAILS: z.string().optional(),
+  CHIEF_MCP_URL: z.string().default('https://the-chef-sepia.vercel.app/api/mcp'),
+  CHIEF_MCP_KEY: z.string().optional(),
   MAX_SUBAGENTS: z.coerce.number().int().min(1).max(8).default(3),
   MAX_BROWSER_PAGES: z.coerce.number().int().min(1).max(2).default(2),
 });
@@ -58,6 +62,15 @@ export const config = {
   googleOAuthClientId: env.GOOGLE_OAUTH_CLIENT_ID,
   googleOAuthClientSecret: env.GOOGLE_OAUTH_CLIENT_SECRET,
   googleUserEmail: env.GOOGLE_USER_EMAIL,
+  gmailDraftEmail: env.GMAIL_DRAFT_EMAIL || undefined,
+  /** Mailboxes chapi may read (gmail.readonly only), e.g. sales inboxes. Comma-separated. */
+  gmailReadonlyEmails: (env.GMAIL_READONLY_EMAILS ?? '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean),
+  /** The Chief (UnitPulse AI outreach tool) remote MCP; enabled when CHIEF_MCP_KEY is set. */
+  chiefMcpUrl: env.CHIEF_MCP_URL,
+  chiefMcpKey: env.CHIEF_MCP_KEY || undefined,
   maxSubagents: env.MAX_SUBAGENTS,
   maxBrowserPages: env.MAX_BROWSER_PAGES,
   paths: {

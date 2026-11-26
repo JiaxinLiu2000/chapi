@@ -12,13 +12,15 @@ model Session {
   id                  String   @id @default(cuid())
   slug                String   @unique
   title               String   @default("New session") @db.VarChar(300)
+  titleSource         String   @default("auto") // auto (first-message placeholder) | ai | user (renamed; AI never overwrites)
   status              String   @default("active") // active | completed | deleted
   model               String
   subagentModel       String   @default("") // per-session sub-agent / summary model ("" = global default)
-  effort              String   @default("max") // low | medium | high | xhigh | max
+  effort              String   @default("high") // low | medium | high | xhigh | max
   language            String   @default("zh") // zh | en — language for talking to the user
   accountMode         String   @default("auto") // auto | primary | fallback — Claude seat selection
-  qualityReviewMinutes Int     @default(0) // 0=off; else periodic quality-review interval (min)
+  qualityReviewMinutes Int     @default(5) // 0=off; else periodic quality-review interval (min)
+  qualityModel        String   @default("") // quality-advisor model ("" = global sub-agent model)
   permissionProfile   String   @default("web") // web | vscode
   sdkSessionId        String? // Claude Agent SDK session id, for resume
   // usage / monitoring rollups
@@ -47,7 +49,80 @@ model Session {
   approvals        Approval[]
   memorySummaries  MemorySummary[]
   usageEvents      UsageEvent[]
+  workflowRuns     WorkflowRun[]
+  automationRuns   AutomationRun[]
 
+  projectId     String?
+  project       Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  projectSource String   @default("ai") // ai | user (user = set by hand; AI never reassigns)
+
+  @@index([status])
+  @@index([projectId])
+}
+
+/** A group of related sessions on the /board page — see docs/superpowers/specs/2026-11-24-board-automations-design.md. */
+model Project {
+  id        String    @id @default(cuid())
+  name      String    @db.VarChar(200)
+  summary   String?   @db.Text
+  summaryAt DateTime?
+  sortOrder Int       @default(0)
+  archived  Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  sessions    Session[]
+  automations Automation[]
+}
+
+/** A registered recurring task (SOP-backed or fixed-prompt manual). */
+model Automation {
+  id            String    @id @default(cuid())
+  name          String    @db.VarChar(200)
+  workflowId    String?
+  workflow      Workflow? @relation(fields: [workflowId], references: [id], onDelete: SetNull)
+  prompt        String?   @db.Text // only for manual tasks without an SOP
+  schedule      Json // ScheduleSpec
+  mode          String    @default("manual") // manual | auto
+  enabled       Boolean   @default(true)
+  model         String    @default("")
+  effort        String    @default("high")
+  inputs        Json? // SOP inputs with placeholders {today} {weekStart} {weekEnd} {MD}
+  projectId     String?
+  project       Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  lastRunAt     DateTime?
+  lastSessionId String?
+  lastStatus    String?
+  nextRunAt     DateTime?
+  // When mode became 'auto'. Slots at/before this are never caught up. Task 6's PATCH route MUST set
+  // autoSince=now whenever mode changes to 'auto' (null while auto = legacy row: cron baselines it on first tick).
+  autoSince     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  runs AutomationRun[]
+
+  @@index([workflowId])
+  @@index([projectId])
+}
+
+model AutomationRun {
+  id              String     @id @default(cuid())
+  automationId    String
+  automation      Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  sessionId       String? // null once the session is hard-deleted (row kept so the dueAt slot stays handled)
+  session         Session?   @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  workflowRunId   String?
+  workflowVersion Int?
+  trigger         String     @default("manual") // manual | cron | catchup | history (linked past session, always done)
+  status          String     @default("running") // queued|running|waiting_user|done|failed|skipped|stale
+  note            String?    @db.Text
+  dueAt           DateTime? // scheduled slot this run covers (null for manual runs)
+  startedAt       DateTime   @default(now())
+  endedAt         DateTime?
+
+  @@unique([automationId, dueAt])
+  @@index([sessionId])
   @@index([status])
 }
 
@@ -97,7 +172,7 @@ model UsageEvent {
   sessionId    String
   session      Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   account      String // primary | fallback | machine
-  trigger      String // user_turn | quality_review | summarize | consolidate
+  trigger      String // user_turn | quality_review | summarize | consolidate | title
   model        String
   inputTokens  Int      @default(0)
   outputTokens Int      @default(0)
@@ -132,6 +207,15 @@ model PlanTask {
   ordinal   Int
   text      String   @db.Text
   status    String   @default("pending") // pending|in_progress|done|failed|problem|replaced|blocked|error
+  reason    String?  @db.Text // why it failed / hit a problem / was blocked / was replaced
+  replacesId String? // the step this one replaced (a change of approach)
+  startedAt DateTime? // first time it went in_progress (start of its learning window)
+  endedAt   DateTime? // last terminal status change
+  nodeRunId String? // workflow NodeRun this step mirrors (engine-owned)
+  locked    Boolean  @default(false) // engine-owned: the model can't remove/finish it
+  depth     Int      @default(0) // 0 = step, 1 = sub-step (indented under its stage)
+  progress  Int? // 0-100, engine-owned rows only (drives the progress fill)
+  learnedStatus String? // last status the learning agent already learned from
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -186,6 +270,8 @@ model PendingQuestion {
   options    Json?
   answer     String?   @db.Text
   status     String    @default("open") // open|answered
+  source     String    @default("agent") // agent (ask_user, blocks the run) | learning (preference conflict, never blocks)
+  meta       Json? // learning: { entryId, proposal, context } to resolve the conflict after the answer
   createdAt  DateTime  @default(now())
   answeredAt DateTime?
 
@@ -213,8 +299,28 @@ model WikiEntry {
   bodyMd     String   @db.LongText
   sourceRefs Json
   tags       Json
+  category   String   @default("") @db.VarChar(120) // Obsidian vault folder under entries/
+  aliases    Json? // alternate phrasings (Obsidian `aliases`), also embedded for search
+  relPath    String   @default("") @db.VarChar(500) // file path inside the vault, e.g. entries/网页抓取/X.md
+  fileHash   String   @default("") @db.VarChar(64) // sha256 of the vault file last synced
+  kind       String   @default("skill") @db.VarChar(20) // data | skill | preference
+  topics     Json? // 1-3 content categories (website / project / client / domain), e.g. ["apartments.com","Tower II 租金竞品"]
+  score      Int      @default(50) // 0-100: confidence (data) / weight (skill, preference)
+  polarity   String   @default("") @db.VarChar(10) // preference: positive | negative
+  situation  String?  @db.Text // 情况 / 前提 (data: 对象与口径)
+  solution   String?  @db.Text // 方案 (data: 数据内容; preference: 期望做法)
+  observedAt DateTime? // data: when the data is from
+  history    Json? // [{at, op, delta, score, note, sessionId}]
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+/** Canonical tag registry so differently-spelled tags that mean the same thing collapse to one. */
+model WikiTag {
+  name      String   @id @db.VarChar(120) // canonical spelling
+  kind      String   @default("topic") @db.VarChar(20) // tool (skill) | scenario (preference) | topic (data) | category (content category)
+  aliases   Json // other spellings that map to this tag
+  createdAt DateTime @default(now())
 }
 
 model MemorySummary {
@@ -234,4 +340,147 @@ model Setting {
   value     String   @db.Text
   encrypted Boolean  @default(false)
   updatedAt DateTime @updatedAt
+}
+
+/** A confirmed / draft SOP — see docs/superpowers/specs/2026-11-22-workflow-sop-design.md. */
+model Workflow {
+  id               String   @id @default(cuid())
+  slug             String   @unique
+  name             String   @db.VarChar(200)
+  aliases          Json?
+  whenToUse        String?  @db.Text
+  description      String?  @db.Text
+  sourceRef        String?  @db.Text
+  status           String   @default("draft") // draft|confirmed|archived
+  confirmedVersion Int?
+  trigger          Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  versions         WorkflowVersion[]
+  runs             WorkflowRun[]
+  automations      Automation[]
+}
+
+model WorkflowVersion {
+  id          String    @id @default(cuid())
+  workflowId  String
+  workflow    Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  version     Int
+  graph       Json
+  state       String    @default("draft") // draft|confirmed|superseded
+  createdBy   String    @default("user") // user|ai
+  note        String?   @db.Text
+  confirmedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([workflowId, version])
+}
+
+model WorkflowRun {
+  id             String    @id @default(cuid())
+  workflowId     String
+  workflow       Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  version        Int
+  graph          Json
+  sessionId      String
+  session        Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionHistory Json?
+  label          String?   @db.VarChar(200)
+  inputs         Json?
+  status         String    @default("running") // running|waiting_user|blocked|done|cancelled|failed
+  startNodeId    String?
+  cursor         Json?
+  pendingToken   String?   @db.VarChar(40)
+  trigger        String    @default("manual") // manual|cron|chat
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  endedAt        DateTime?
+  nodeRuns       WorkflowNodeRun[]
+
+  @@index([sessionId])
+  @@index([workflowId, status])
+}
+
+model WorkflowNodeRun {
+  id           String      @id @default(cuid())
+  runId        String
+  run          WorkflowRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  nodeId       String
+  iterKey      String      @default("") @db.VarChar(120)
+  status       String      @default("pending")
+  agentId      String?     @db.VarChar(80)
+  agentRunId   String?
+  summary      String?     @db.Text
+  evidence     Json?
+  review       Json?
+  checkResult  Json?
+  verifyResult Json?
+  skipReason   String?     @db.Text
+  attempts     Int         @default(0)
+  remindCount  Int         @default(0) // SubagentStop / turn-end reminders for the current attempt
+  lastFeedback String?     @db.Text // main AI's redo feedback, carried into the next card
+  substeps     Json? // [{id, status: pending|done|na, note}] for the current attempt
+  startedAt    DateTime?
+  endedAt      DateTime?
+
+  @@unique([runId, nodeId, iterKey])
+}
+
+// ── WeChat remote (iLink bot) ───────────────────────────────────────────────
+// One logged-in WeChat bot account. Only the WeChat user who scanned the login
+// QR (ownerUserId) may drive chapi through it.
+model WechatAccount {
+  id             String    @id // ilink_bot_id
+  token          String    @db.Text // bot_token (encrypted with SECRETS_KEY)
+  baseUrl        String    @default("https://ilinkai.weixin.qq.com")
+  ownerUserId    String    @default("") // ilink_user_id of the scanner
+  updatesBuf     String?   @db.Text // getupdates cursor
+  contextToken   String?   @db.Text // latest per-message context token (echoed on every send)
+  contextAt      DateTime? // when contextToken was last refreshed by an inbound message
+  focusSessionId String? // session that plain (non-quoted) replies go to
+  status         String    @default("active") // active | stale | logged_out
+  lastInboundAt  DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+// A session connected to WeChat: its completions / questions / approvals are pushed.
+model WechatBinding {
+  sessionId String   @id
+  tag       String // short label shown on pushes (A, B, C…)
+  createdAt DateTime @default(now())
+}
+
+// Messages chapi pushed to WeChat — lets a quoted reply find its session/question
+// and lets "/详细" fetch the full original.
+model WechatOutbound {
+  messageId String   @id // server message_id returned by sendmessage
+  sessionId String?
+  kind      String // completion | question | approval | error | info | file
+  refId     String? // questionId / approvalId
+  fullText  String?  @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// ── Discord remote ──────────────────────────────────────────────────────────
+// A session connected to Discord: it gets its own thread in the configured channel.
+model DiscordBinding {
+  sessionId String   @id
+  threadId  String   @unique
+  createdAt DateTime @default(now())
+}
+
+// Messages chapi posted to Discord (detail button / editing question & approval cards).
+model DiscordOutbound {
+  messageId String   @id
+  sessionId String?
+  threadId  String
+  kind      String // completion | question | approval | error | info | detail
+  refId     String? // questionId / approvalId
+  fullText  String?  @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([refId])
 }

@@ -2,16 +2,22 @@ import { MODEL_OPTIONS, topAllowedModel, type ContentBlock } from '@chapi/shared
 import { prisma } from '../db/client.js';
 import { bus } from '../gateway/bus.js';
 import { createLogger } from '../logger.js';
-import { toSessionDTO } from '../mappers.js';
+import { toMessageDTO, toSessionDTO } from '../mappers.js';
 import type { Orchestrator } from '../orchestrator/types.js';
 import { setSessionStatus } from '../services/sessions.js';
-import { consolidateSession } from '../learning/consolidate.js';
+import { setUserChromeEnabled } from '../services/userChrome.js';
+import { isSystemInjected, learner } from '../learning/learner.js';
+import { recallBlock } from '../knowledge/recall.js';
+import { sopHintFor } from '../workflow/routing.js';
 import { summarizeSession } from '../learning/summarize.js';
+import { generateSessionTitle } from '../learning/title.js';
 import { settings } from '../secrets.js';
 import { hitl } from './hitl.js';
+import { recordAnswer, recordApproval } from './hitlTranscript.js';
 import { Run, type QueryFn } from './run.js';
 import { chooseActiveAccount, recordAccountLimited } from './accounts.js';
-import { scheduler } from './scheduler.js';
+import { qualityAdvisor } from './quality.js';
+import { agentInbox } from './inbox.js';
 
 const log = createLogger('engine:orchestrator');
 
@@ -90,7 +96,7 @@ export class SdkOrchestrator implements Orchestrator {
     }
 
     const content: ContentBlock[] = [{ type: 'text', text }];
-    await prisma.message.create({
+    const userRow = await prisma.message.create({
       data: {
         sessionId,
         role: 'user',
@@ -99,18 +105,41 @@ export class SdkOrchestrator implements Orchestrator {
         text,
       },
     });
+    // Remote chats (Discord) mirror what was typed elsewhere; the web ignores this event.
+    bus.emit({ type: 'user.message', sessionId, message: toMessageDTO(userRow) });
     const updated = await prisma.session.update({
       where: { id: sessionId },
       data: { roundCount: { increment: 1 } },
     });
 
-    await this.getRun(sessionId).pushUserMessage(text);
+    const wasWorking = agentInbox.busy(sessionId);
+    const injected = isSystemInjected(text);
+    // A real user message: the next turn is the user's (resumes the 质检 clock after a follow-up turn).
+    if (!injected) qualityAdvisor.onUserMessage(sessionId);
+    // Read the vault before acting: relevant knowledge points (strongest first) and
+    // notes the side agents held for this turn ride along — the transcript keeps
+    // only the user's own words.
+    const recall = injected
+      ? null
+      : await recallBlock(text, {
+          heading: updated.roundCount === 1 ? '[知识图谱·规划前先看：与任务相关的已有知识点]' : '[知识图谱·与这条消息相关的知识点]',
+          k: 8,
+        }).catch(() => null);
+    const held = agentInbox.take(sessionId);
+    // A request that names a confirmed SOP must run as a workflow (not a hand-written plan).
+    const sopHint = injected ? null : await sopHintFor(sessionId, text).catch(() => null);
+    await this.getRun(sessionId).pushUserMessage([text, sopHint, recall, held].filter(Boolean).join('\n\n'));
 
-    // Arm the periodic quality reviewer if this session has a cadence set (re-arms
-    // after a server restart, since the timers are in-memory).
-    const qrm = session.qualityReviewMinutes ?? 0;
-    if (qrm > 0 && !scheduler.isQualityReviewOn(sessionId)) {
-      scheduler.scheduleQualityReview(sessionId, qrm * 60_000);
+    // Learning: every user message after the conversation's first (mid-run or idle).
+    if (!injected && updated.roundCount > 1) learner.enqueue(sessionId, { type: 'user', text, whileWorking: wasWorking });
+
+    // Make sure the advisor's timer is live for this session's cadence.
+    await qualityAdvisor.ensure(sessionId, session.qualityReviewMinutes ?? 0);
+
+    // AI title: once from the opening request, then once more after a few rounds
+    // when the conversation has taken shape. Never over a user's own rename.
+    if ((updated.roundCount === 1 || updated.roundCount === 3) && updated.titleSource !== 'user') {
+      void generateSessionTitle(sessionId);
     }
 
     // Every 5 user rounds: roll up a summary to save context (fire-and-forget).
@@ -119,7 +148,20 @@ export class SdkOrchestrator implements Orchestrator {
     }
   }
 
+  async injectAdvice(sessionId: string, text: string): Promise<void> {
+    const session = await prisma.session.findUnique({ where: { id: sessionId } });
+    if (!session || session.status !== 'active') return;
+    // Straight into the run's input — not persisted as a user message (the advisor
+    // already posted its own 质检 bubble), and not counted as a user round.
+    await this.getRun(sessionId).pushUserMessage(text);
+  }
+
+  async runQualityReview(sessionId: string): Promise<void> {
+    await qualityAdvisor.review(sessionId, true);
+  }
+
   async interrupt(sessionId: string): Promise<void> {
+    qualityAdvisor.noteInterrupt(sessionId);
     await this.runs.get(sessionId)?.interrupt();
   }
 
@@ -128,15 +170,33 @@ export class SdkOrchestrator implements Orchestrator {
     questionId: string,
     answer: string,
   ): Promise<void> {
-    await prisma.pendingQuestion
+    const before = await prisma.pendingQuestion.findUnique({ where: { id: questionId } }).catch(() => null);
+    const row = await prisma.pendingQuestion
       .update({
         where: { id: questionId },
         data: { answer, status: 'answered', answeredAt: new Date() },
       })
-      .catch((err) => log.warn('answerQuestion update failed', err));
+      .catch((err) => {
+        log.warn('answerQuestion update failed', err);
+        return null;
+      });
+    // Keep the question, its options and the answer in the conversation history.
+    if (row && before?.status === 'open') {
+      await recordAnswer(row, answer).catch((err) => log.warn('record answer failed', err));
+    }
+    bus.emit({ type: 'question.closed', sessionId, questionId });
+    if (row?.source === 'learning') {
+      // A preference conflict from the learning agent: resolve it on the side;
+      // the main agent was never blocked and gets the result via its inbox.
+      if (before?.status === 'open') void learner.onLearningAnswer(row, answer);
+      return;
+    }
     // Unblock the in-flight ask_user tool so the agent continues.
     hitl.resolveQuestion(questionId, answer);
-    bus.emit({ type: 'question.closed', sessionId, questionId });
+    if (row && before?.status === 'open') {
+      const options = Array.isArray(row.options) ? (row.options as string[]) : null;
+      learner.enqueue(sessionId, { type: 'answer', question: row.question, options, answer });
+    }
   }
 
   async decideApproval(
@@ -145,7 +205,8 @@ export class SdkOrchestrator implements Orchestrator {
     decision: 'approve' | 'reject' | 'revise',
     feedback?: string,
   ): Promise<void> {
-    await prisma.approval
+    const before = await prisma.approval.findUnique({ where: { id: approvalId } }).catch(() => null);
+    const row = await prisma.approval
       .update({
         where: { id: approvalId },
         data: {
@@ -154,13 +215,23 @@ export class SdkOrchestrator implements Orchestrator {
           decidedAt: new Date(),
         },
       })
-      .catch((err) => log.warn('decideApproval update failed', err));
+      .catch((err) => {
+        log.warn('decideApproval update failed', err);
+        return null;
+      });
+    // Keep the reviewed summary, the decision and the user's feedback in the history.
+    if (row && before?.status === 'open') {
+      await recordApproval(row, decision, feedback ?? null).catch((err) => log.warn('record approval failed', err));
+    }
     hitl.resolveApproval(approvalId, { decision, feedback });
     bus.emit({ type: 'approval.closed', sessionId, approvalId });
+    if (row && before?.status === 'open') {
+      learner.enqueue(sessionId, { type: 'approval', summary: row.summary, decision, feedback: feedback ?? null });
+    }
   }
 
   async markCompleted(sessionId: string): Promise<void> {
-    scheduler.cancelQualityReview(sessionId);
+    qualityAdvisor.stop(sessionId);
     await this.runs.get(sessionId)?.stop().catch(() => undefined);
     this.runs.delete(sessionId);
     bus.emit({
@@ -171,12 +242,12 @@ export class SdkOrchestrator implements Orchestrator {
       body: '正在复盘学习并归档…',
     });
     // Distill reusable knowledge into the wiki while the transcript is intact.
-    await consolidateSession(sessionId).catch((err) => log.warn('consolidate error', err));
+    await learner.learnNow(sessionId, { type: 'archive' }).catch((err) => log.warn('archive learning error', err));
     await setSessionStatus(sessionId, 'completed');
   }
 
   async abandon(sessionId: string): Promise<void> {
-    scheduler.cancelQualityReview(sessionId);
+    qualityAdvisor.stop(sessionId);
     await this.runs.get(sessionId)?.stop().catch(() => undefined);
     this.runs.delete(sessionId);
   }
@@ -345,7 +416,16 @@ export class SdkOrchestrator implements Orchestrator {
     language?: string,
     accountMode?: string,
     qualityReviewMinutes?: number,
+    qualityModel?: string,
+    userChrome?: boolean,
   ): Promise<void> {
+    if (userChrome !== undefined) {
+      // Not a DB column (see services/userChrome.ts) and checked live by the
+      // sandbox helper — no run restart needed.
+      setUserChromeEnabled(sessionId, userChrome);
+      const s = await prisma.session.findUnique({ where: { id: sessionId } });
+      if (s) bus.emit({ type: 'session.updated', session: toSessionDTO(s) });
+    }
     const data: {
       model?: string;
       effort?: string;
@@ -353,6 +433,7 @@ export class SdkOrchestrator implements Orchestrator {
       language?: string;
       accountMode?: string;
       qualityReviewMinutes?: number;
+      qualityModel?: string;
     } = {};
     if (model) data.model = model;
     if (effort) data.effort = effort;
@@ -360,15 +441,13 @@ export class SdkOrchestrator implements Orchestrator {
     if (language) data.language = language;
     if (accountMode) data.accountMode = accountMode;
     if (qualityReviewMinutes !== undefined) data.qualityReviewMinutes = qualityReviewMinutes;
+    if (qualityModel !== undefined) data.qualityModel = qualityModel; // read per review — no restart
     if (Object.keys(data).length === 0) return;
 
     const updated = await prisma.session.update({ where: { id: sessionId }, data });
 
-    // Quality-review cadence: start/stop the recurring reviewer (no run restart needed).
-    if (qualityReviewMinutes !== undefined) {
-      if (qualityReviewMinutes > 0) scheduler.scheduleQualityReview(sessionId, qualityReviewMinutes * 60_000);
-      else scheduler.cancelQualityReview(sessionId);
-    }
+    // Quality-review cadence applies immediately (independent advisor, no run restart).
+    if (qualityReviewMinutes !== undefined) await qualityAdvisor.configure(sessionId, qualityReviewMinutes);
     const run = this.runs.get(sessionId);
     if (run) {
       if (effort || language || subagentModel || accountMode) {

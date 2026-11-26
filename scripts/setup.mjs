@@ -20,6 +20,9 @@ for (const [tool, ok] of [
 ]) {
   console.log(`  ${ok ? '✓' : '✗'} ${tool}${ok ? '' : ' (missing — install it)'}`);
 }
+// Optional: only the email-verification feature needs it (`go version`, not `--version`).
+const hasGo = spawnSync('go', ['version'], { shell: true }).status === 0;
+console.log(`  ${hasGo ? '✓' : '·'} go${hasGo ? '' : ' (optional — needed for email verification: winget install GoLang.Go)'}`);
 
 // .env
 const envPath = path.join(root, '.env');

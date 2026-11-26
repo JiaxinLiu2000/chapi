@@ -1,5 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import type { McpServerConfig } from '@anthropic-ai/claude-agent-sdk';
 import { config } from '../../config.js';
@@ -14,6 +15,21 @@ const log = createLogger('mcp-registry');
 // got any mcp__google_workspace__* tools.
 const WORKSPACE_MCP_VERSION = '1.30.0'; // PyPI version (the server self-reports 4.0.10)
 const isWin = process.platform === 'win32';
+
+const WORKSPACE_SERVICES_EXCEPT_GMAIL = [
+  'drive', 'calendar', 'docs', 'sheets', 'chat', 'forms',
+  'slides', 'tasks', 'contacts', 'search', 'appscript',
+];
+export const GMAIL_DRAFT_CREDENTIALS_DIR = path.join(os.homedir(), '.google_workspace_mcp', 'gmail-drafts');
+
+/** MCP server name for a read-only mailbox: raymond.fernandez@x → gmail_ro_raymond_fernandez. */
+export function gmailReadonlyServerName(email: string): string {
+  return `gmail_ro_${email.split('@')[0]!.replace(/[^a-z0-9]+/gi, '_').toLowerCase()}`;
+}
+
+export function gmailReadonlyCredentialsDir(email: string): string {
+  return path.join(os.homedir(), '.google_workspace_mcp', 'gmail-readonly', email.toLowerCase());
+}
 
 /** Path to the persistently-installed workspace-mcp executable, if present. */
 function installedWorkspaceMcp(): string | null {
@@ -58,6 +74,7 @@ export function ensureWorkspaceMcpInstalled(): void {
  *   CHAPI_ENABLE_BROWSER=1    cloakbrowser via Playwright MCP over CDP
  *   Google Workspace         auto-enabled when OAuth client id+secret are set in Settings
  *   Settings.canvaEnabled     Canva remote MCP
+ *   CHIEF_MCP_KEY             The Chief remote MCP (outbound tools blocked)
  */
 export async function buildExternalMcpServers(): Promise<Record<string, McpServerConfig>> {
   const servers: Record<string, McpServerConfig> = {};
@@ -90,28 +107,91 @@ export async function buildExternalMcpServers(): Promise<Record<string, McpServe
     const google = await settings.getGoogleOAuth();
     if (google.clientId && google.clientSecret) {
       const userEmail = await settings.getGoogleUserEmail();
+      const gmailDraftEmail = config.gmailDraftEmail;
+      workspaceMcpExe ??= installedWorkspaceMcp();
+      const launch = (flags: string[]) =>
+        workspaceMcpExe
+          ? { command: workspaceMcpExe, args: flags }
+          : { command: 'uvx', args: [`workspace-mcp@${WORKSPACE_MCP_VERSION}`, ...flags] };
       // --single-user: use the cached OAuth credentials directly (no per-session
       // mapping) so tools work in normal agent runs.
       // --tool-tier extended: registers Gmail's draft_gmail_message (not in 'core').
+      // When a separate Gmail draft account is configured, Gmail is dropped here
+      // so there's only one draft tool (on that account).
       // Sending is still blocked by permissions.ts + disallowedToolsFor.
-      const flags = ['--single-user', '--tool-tier', 'extended'];
-      workspaceMcpExe ??= installedWorkspaceMcp();
+      const flags = [
+        '--single-user',
+        ...(gmailDraftEmail ? ['--tools', ...WORKSPACE_SERVICES_EXCEPT_GMAIL] : []),
+        '--tool-tier',
+        'extended',
+      ];
       servers.google_workspace = {
         type: 'stdio',
-        ...(workspaceMcpExe
-          ? { command: workspaceMcpExe, args: flags }
-          : { command: 'uvx', args: [`workspace-mcp@${WORKSPACE_MCP_VERSION}`, ...flags] }),
+        ...launch(flags),
         env: {
           GOOGLE_OAUTH_CLIENT_ID: google.clientId,
           GOOGLE_OAUTH_CLIENT_SECRET: google.clientSecret,
           ...(userEmail ? { USER_GOOGLE_EMAIL: userEmail } : {}),
         },
       };
+
+      // Gmail drafts on a separate account (GMAIL_DRAFT_EMAIL). gmail:drafts asks
+      // Google for readonly+labels+modify+compose — never gmail.send — so the
+      // send tool isn't even registered; label/modify tools are disabled too,
+      // leaving only reading (for in-thread reply drafts) and draft_gmail_message.
+      // Own credentials dir so its token never mixes with the main account's.
+      if (gmailDraftEmail) {
+        servers.gmail = {
+          type: 'stdio',
+          ...launch([
+            '--single-user',
+            '--permissions',
+            'gmail:drafts',
+            '--disabled-tools',
+            'manage_gmail_label',
+            'modify_gmail_message_labels',
+            'batch_modify_gmail_message_labels',
+          ]),
+          env: {
+            GOOGLE_OAUTH_CLIENT_ID: google.clientId,
+            GOOGLE_OAUTH_CLIENT_SECRET: google.clientSecret,
+            USER_GOOGLE_EMAIL: gmailDraftEmail,
+            WORKSPACE_MCP_CREDENTIALS_DIR: GMAIL_DRAFT_CREDENTIALS_DIR,
+          },
+        };
+      }
+
+      // Read-only mailboxes (GMAIL_READONLY_EMAILS, e.g. sales inboxes for customer
+      // research). gmail:readonly asks Google for gmail.readonly only, so these
+      // can't draft, send, label or delete. One server + credentials dir each.
+      for (const email of config.gmailReadonlyEmails) {
+        servers[gmailReadonlyServerName(email)] = {
+          type: 'stdio',
+          ...launch(['--single-user', '--permissions', 'gmail:readonly']),
+          env: {
+            GOOGLE_OAUTH_CLIENT_ID: google.clientId,
+            GOOGLE_OAUTH_CLIENT_SECRET: google.clientSecret,
+            USER_GOOGLE_EMAIL: email,
+            WORKSPACE_MCP_CREDENTIALS_DIR: gmailReadonlyCredentialsDir(email),
+          },
+        };
+      }
     }
   }
 
   if (await settings.getCanvaEnabled()) {
     servers.canva = { type: 'http', url: 'https://mcp.canva.com/mcp' };
+  }
+
+  // The Chief (UnitPulse AI outreach tool). Its key can act on real customers, so
+  // every outbound tool (approve+send, reply, calendar invite…) is hard-blocked
+  // in permissions.ts (isChiefOutboundTool + CHIEF_BLOCKED_TOOLS).
+  if (config.chiefMcpKey) {
+    servers.chief = {
+      type: 'http',
+      url: config.chiefMcpUrl,
+      headers: { Authorization: `Bearer ${config.chiefMcpKey}` },
+    };
   }
 
   if (Object.keys(servers).length > 0) {

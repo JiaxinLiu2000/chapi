@@ -1,0 +1,164 @@
+{
+  "name": "演示 SOP：名单统计",
+  "slug": "demo-roster",
+  "aliases": [
+    "演示 SOP",
+    "名单统计"
+  ],
+  "whenToUse": "测试工作流引擎：统计一份名单、写摘要、再自检",
+  "confirm": true,
+  "graph": {
+    "nodes": [
+      {
+        "id": "start",
+        "type": "start",
+        "title": "开始"
+      },
+      {
+        "id": "collect",
+        "type": "step",
+        "title": "阶段 1 生成名单",
+        "instructions": "在本阶段产出目录里新建 roster.csv，表头为 name,company，写入 5 行虚构的人名和公司（公司名用 Acme / Globex / Initech 之一）。不要联网。",
+        "outputs": [
+          {
+            "name": "名单",
+            "file": "roster.csv"
+          }
+        ],
+        "doneCriteria": [
+          "roster.csv 已写入产出目录且有表头",
+          "正好 5 行数据"
+        ],
+        "evidence": [
+          {
+            "key": "file",
+            "type": "path",
+            "desc": "roster.csv 的绝对路径"
+          },
+          {
+            "key": "rows",
+            "type": "int",
+            "desc": "数据行数（不含表头）"
+          }
+        ],
+        "substeps": [
+          {
+            "id": "s1",
+            "title": "新建 roster.csv 并写表头"
+          },
+          {
+            "id": "s2",
+            "title": "写入 5 行虚构数据"
+          },
+          {
+            "id": "s3",
+            "title": "回读核对行数"
+          }
+        ],
+        "icon": "googlesheets"
+      },
+      {
+        "id": "count",
+        "type": "step",
+        "title": "阶段 2 按公司统计",
+        "instructions": "读取上游的 roster.csv，按公司统计人数，把结果写成本阶段产出目录里的 counts.json（公司 → 人数）。",
+        "inputs": [
+          {
+            "name": "名单",
+            "from": "collect",
+            "desc": "上游 roster.csv"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "统计",
+            "file": "counts.json"
+          }
+        ],
+        "doneCriteria": [
+          "counts.json 已写入",
+          "各公司人数之和等于名单行数"
+        ],
+        "evidence": [
+          {
+            "key": "file",
+            "type": "path"
+          },
+          {
+            "key": "total",
+            "type": "int",
+            "desc": "各公司人数之和"
+          },
+          {
+            "key": "companies",
+            "type": "int",
+            "desc": "公司个数"
+          }
+        ],
+        "substeps": [
+          {
+            "id": "s1",
+            "title": "读取上游 roster.csv"
+          },
+          {
+            "id": "s2",
+            "title": "按公司统计人数"
+          },
+          {
+            "id": "s3",
+            "title": "写入 counts.json"
+          }
+        ],
+        "icon": "calc"
+      },
+      {
+        "id": "summary",
+        "type": "step",
+        "title": "阶段 3 写一句摘要",
+        "instructions": "根据上游 counts.json 写一句中文摘要（哪家公司人最多、共多少人）。",
+        "inputs": [
+          {
+            "name": "统计",
+            "from": "count"
+          }
+        ],
+        "doneCriteria": [
+          "摘要已提交并存为 summary.md",
+          "摘要里的人数与 counts.json 一致"
+        ],
+        "evidence": [
+          {
+            "key": "summary",
+            "type": "string",
+            "saveAs": "summary.md",
+            "desc": "摘要原文"
+          }
+        ],
+        "icon": "summary"
+      },
+      {
+        "id": "end",
+        "type": "end",
+        "title": "结束"
+      }
+    ],
+    "edges": [
+      {
+        "from": "start",
+        "to": "collect"
+      },
+      {
+        "from": "collect",
+        "to": "count"
+      },
+      {
+        "from": "count",
+        "to": "summary"
+      },
+      {
+        "from": "summary",
+        "to": "end"
+      }
+    ]
+  }
+}

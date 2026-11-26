@@ -30,17 +30,14 @@ const SKILLS_INDEX = `# 技能 (Skills) — 共享 · 工具用法目录
 约定：文件类产物放会话沙盘；最终优先上传 Google Drive 并用 \`save_artifact\` 登记链接。
 `;
 
-const WIKI_INDEX = `# AI Wiki — 共享 · 可复用知识
+const WIKI_INDEX = `# AI Wiki — 共享知识图谱（Obsidian 知识库）
 
-在需要时学习并总结成 wiki（重要文件要点、可复用的网络资料、用户偏好、纠错后的真实需求、
-成功任务的工作流与正确的表格/邮件格式）。通过 \`wiki_write\` 写入、\`wiki_search\` 检索。
+由**原子知识点**组成，分三类：技能（工具/方法用法，权重 0-100，工具标签）、偏好（用户希望/不希望的做法，
+权重 0-100，场景标签，正面/负面）、数据（来自文档/网络/用户的第三方数据，置信度 0-100，来源与数据时间）。
+每个知识点有「情况 / 前提」与「方案」两段，存于 \`entries/技能|偏好|数据/<标题>.md\`，用 \`[[标题]]\` 双链互相引用。
 
-要求：
-- 每条知识**保留来源**（原始资料路径 / 网页 URL / 会话消息 id），以便验证。
-- 可提供多个「问法/索引」，让不同提问都能命中同一答案。
-- 标题相同则更新已有条目，保持准确与稳定。
-
-条目正文以 Markdown 存于 \`entries/\`（由系统镜像写出，主索引在数据库 + 向量库）。
+学习由「学习代理」自动完成（步骤收尾、用户发言、回答/审批后）；使用时 \`wiki_search\` → \`wiki_read\`，
+相关知识点按权重/置信度排序。本目录即 Obsidian vault，在 Obsidian 里的修改会自动同步回 Chapi。
 `;
 
 async function writeIfMissing(file: string, content: string): Promise<void> {
@@ -54,7 +51,7 @@ async function writeIfMissing(file: string, content: string): Promise<void> {
 
 // Helper modules copied into every session sandbox so the agent's scripts can
 // `import` them directly (cwd = sandbox). Kept fresh by copying on each run.
-const SANDBOX_HELPERS = ['chapi_browser.py'];
+const SANDBOX_HELPERS = ['chapi_browser.py', 'chapi_slack.py'];
 
 /**
  * Copy the script helpers (e.g. chapi_browser.py — the CDP interface to the

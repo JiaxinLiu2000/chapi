@@ -1,7 +1,8 @@
 'use client';
 import { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useStore } from '@/lib/store';
-import { getSocket } from '@/lib/ws';
+import { getSocket, watchBoard } from '@/lib/ws';
 import type { NotificationLevel } from '@chapi/shared';
 
 const LEVEL_BY_KIND: Record<string, NotificationLevel> = {
@@ -22,6 +23,12 @@ const PREFIX_BY_KIND: Record<string, string> = {
  * session shows its own inline toast (via applyEvent), so we skip those here.
  */
 export function GlobalAlerts() {
+  const qc = useQueryClient();
+  // Board queries (['board', …]) follow the server: invalidated here so any open view refetches.
+  useEffect(
+    () => watchBoard((scope) => void qc.invalidateQueries({ queryKey: scope === 'all' ? ['board'] : ['board', 'today'] })),
+    [qc],
+  );
   useEffect(() => {
     const socket = getSocket();
     const off = socket.on((e) => {

@@ -8,6 +8,11 @@ import { wikiRoutes } from './routes/wiki.js';
 import { uploadRoutes } from './routes/uploads.js';
 import { browserRoutes } from './routes/browser.js';
 import { usageRoutes } from './routes/usage.js';
+import { emailVerifyRoutes } from './routes/emailVerify.js';
+import { workflowRoutes } from './routes/workflows.js';
+import { boardRoutes } from './routes/board.js';
+import { wechatRoutes } from './routes/wechat.js';
+import { discordRoutes } from './routes/discord.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: false, bodyLimit: 25 * 1024 * 1024 });
@@ -47,6 +52,11 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(uploadRoutes, { prefix: '/api' });
   await app.register(browserRoutes, { prefix: '/api' });
   await app.register(usageRoutes, { prefix: '/api' });
+  await app.register(emailVerifyRoutes, { prefix: '/api' });
+  await app.register(workflowRoutes, { prefix: '/api' });
+  await app.register(boardRoutes, { prefix: '/api' });
+  await app.register(wechatRoutes, { prefix: '/api' });
+  await app.register(discordRoutes, { prefix: '/api' });
 
   return app;
 }

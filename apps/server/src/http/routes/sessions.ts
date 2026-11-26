@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { createSessionSchema } from '@chapi/shared';
+import { createSessionSchema, renameSessionSchema } from '@chapi/shared';
 import { prisma } from '../../db/client.js';
 import { getOrchestrator } from '../../orchestrator/types.js';
 import {
@@ -9,11 +9,26 @@ import {
   getSessionBySlug,
   getSessionDetail,
   listSessions,
+  renameSession,
+  searchSessions,
 } from '../../services/sessions.js';
 
 export async function sessionRoutes(app: FastifyInstance): Promise<void> {
   app.get('/sessions', async () => {
     return { sessions: await listSessions() };
+  });
+
+  // Full-text search over conversation content (titles are filtered client-side).
+  app.get<{ Querystring: { q?: string } }>('/sessions/search', async (req) => {
+    return searchSessions(String(req.query.q ?? '').slice(0, 200));
+  });
+
+  app.patch<{ Params: { id: string } }>('/sessions/:id', async (req, reply) => {
+    const parsed = renameSessionSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return reply.status(400).send({ error: parsed.error.message });
+    const session = await renameSession(req.params.id, parsed.data.title);
+    if (!session) return reply.status(404).send({ error: 'session not found' });
+    return { session };
   });
 
   app.post('/sessions', async (req, reply) => {

@@ -1,12 +1,13 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { prisma } from '../db/client.js';
-import { searchWiki, writeWikiEntry } from './wiki.js';
+import { deleteWikiEntry, searchWiki, writeWikiEntry } from './wiki.js';
 
 describe('wiki write/search (DB path, graceful without OpenAI key)', () => {
   let slug: string;
 
   afterAll(async () => {
-    if (slug) await prisma.wikiEntry.deleteMany({ where: { slug } });
+    const row = slug ? await prisma.wikiEntry.findUnique({ where: { slug } }) : null;
+    if (row) await deleteWikiEntry(row.id); // also removes its Obsidian note file
     await prisma.$disconnect();
   });
 

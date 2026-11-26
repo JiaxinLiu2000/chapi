@@ -7,23 +7,21 @@ import type {
 import { prisma } from '../db/client.js';
 import { bus } from '../gateway/bus.js';
 import { createLogger } from '../logger.js';
-import { sessionUsage, toAgentRunDTO, toPlanTaskDTO, toToolCallDTO } from '../mappers.js';
+import { sessionUsage, toAgentRunDTO, toToolCallDTO } from '../mappers.js';
 import { preview } from './content.js';
 import { describeActivity } from './activity.js';
 
 const log = createLogger('monitoring');
 
-interface IncomingTodo {
-  content?: string;
-  status?: string;
-  activeForm?: string;
-}
-
 /**
- * Tracks agent runs, tool calls and the plan (TodoWrite) for one session,
+ * Tracks agent runs and tool calls for one session,
  * persisting to the DB and emitting live events for the monitoring card.
  * Driven by the SDK hooks (which carry agent_id/agent_type for attribution).
  */
+/** elapsedMs is a MySQL INT: keep it in range whatever happens to the clock or the row. */
+const INT_MAX = 2_147_483_647;
+const clampMs = (ms: number): number => Math.max(0, Math.min(INT_MAX, Math.round(ms)));
+
 export class RunMonitor {
   /** agent key ("main" or subagent agent_id) -> AgentRun.id */
   private agents = new Map<string, string>();
@@ -66,7 +64,9 @@ export class RunMonitor {
         },
       });
       this.agents.set('main', updated.id);
-      this.agentStart.set(updated.id, updated.startedAt?.getTime() ?? Date.now());
+      // Accumulate active time on the reused row; never count wall time since its first day
+      // (a month-old conversation overflowed the INT column that way).
+      this.agentStart.set(updated.id, Date.now() - (keep.elapsedMs ?? 0));
       bus.emit({ type: 'agent.status', sessionId: this.sessionId, agent: toAgentRunDTO(updated) });
       return updated.id;
     }
@@ -127,7 +127,7 @@ export class RunMonitor {
             currentTool: null,
             currentActivity: null,
             endedAt: new Date(),
-            elapsedMs: Date.now() - start,
+            elapsedMs: clampMs(Date.now() - start),
           },
         });
       }
@@ -154,7 +154,7 @@ export class RunMonitor {
         currentActivity: null,
         summary,
         endedAt: new Date(),
-        elapsedMs: Date.now() - start,
+        elapsedMs: clampMs(Date.now() - start),
       },
     });
     await this.emitAgent(id);
@@ -252,62 +252,6 @@ export class RunMonitor {
       });
       await this.emitAgent(agentRunId);
     }
-
-    if (input.tool_name === 'TodoWrite') {
-      const todos = (input.tool_input as { todos?: IncomingTodo[] } | null)?.todos;
-      if (Array.isArray(todos)) await this.syncPlan(todos);
-    }
-  }
-
-  /** Reconcile the plan with a TodoWrite call. Missing tasks are struck (error), not deleted. */
-  async syncPlan(todos: IncomingTodo[]): Promise<void> {
-    const existing = await prisma.planTask.findMany({
-      where: { sessionId: this.sessionId },
-      orderBy: { ordinal: 'asc' },
-    });
-    const byText = new Map(existing.map((t) => [t.text, t]));
-    let maxOrdinal = existing.reduce((m, t) => Math.max(m, t.ordinal), -1);
-    const incoming = new Set<string>();
-
-    for (const todo of todos) {
-      const text = (todo.content ?? '').trim();
-      if (!text) continue;
-      incoming.add(text);
-      const status =
-        todo.status === 'completed'
-          ? 'done'
-          : todo.status === 'in_progress'
-            ? 'in_progress'
-            : 'pending';
-      const ex = byText.get(text);
-      if (ex) {
-        if (ex.status !== status && ex.status !== 'error') {
-          await prisma.planTask.update({ where: { id: ex.id }, data: { status } });
-        }
-      } else {
-        maxOrdinal += 1;
-        await prisma.planTask.create({
-          data: { sessionId: this.sessionId, ordinal: maxOrdinal, text, status },
-        });
-      }
-    }
-
-    for (const t of existing) {
-      if (
-        !incoming.has(t.text) &&
-        t.status !== 'done' &&
-        t.status !== 'replaced' &&
-        t.status !== 'error'
-      ) {
-        await prisma.planTask.update({ where: { id: t.id }, data: { status: 'replaced' } });
-      }
-    }
-
-    const all = await prisma.planTask.findMany({
-      where: { sessionId: this.sessionId },
-      orderBy: { ordinal: 'asc' },
-    });
-    bus.emit({ type: 'plan.updated', sessionId: this.sessionId, tasks: all.map(toPlanTaskDTO) });
   }
 
   /** On run end / interrupt, close out any still-running agents. */
@@ -323,7 +267,7 @@ export class RunMonitor {
             currentTool: null,
             currentActivity: null,
             endedAt: new Date(),
-            elapsedMs: Date.now() - start,
+            elapsedMs: clampMs(Date.now() - start),
           },
         });
         await this.emitAgent(id);

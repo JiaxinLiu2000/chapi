@@ -1,22 +1,48 @@
 'use client';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { CheckCircle2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useStore } from '@/lib/store';
-import { getSocket } from '@/lib/ws';
 import { Composer } from './Composer';
 import { MessageList } from './MessageList';
 import { QuestionDock } from './QuestionDock';
 import { RunConfigBar } from './RunConfigBar';
-import { Button } from './ui/Button';
-import { Modal } from './ui/Modal';
 
 // Scrolling within this many px of the top triggers loading the previous page
 // of older messages (infinite-scroll-up), so long sessions don't load/render
 // their entire history up front.
 const LOAD_EARLIER_THRESHOLD_PX = 150;
 
-export function Chat({ sessionId }: { sessionId: string }) {
+// Jumping to a search hit pages back through history until the message turns
+// up; stop after this many pages (200 messages each) rather than loop forever.
+const MAX_JUMP_PAGES = 50;
+
+/** First case-insensitive occurrence of `needle` in `root`'s rendered text, as a Range. */
+function findTextRange(root: HTMLElement, needle: string): Range | null {
+  const n = needle.toLowerCase();
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const at = (node.textContent ?? '').toLowerCase().indexOf(n);
+    if (at >= 0) {
+      const range = document.createRange();
+      range.setStart(node, at);
+      range.setEnd(node, at + needle.length);
+      return range;
+    }
+  }
+  return null;
+}
+
+export function Chat({
+  sessionId,
+  focusMessageId,
+  focusQuery,
+}: {
+  sessionId: string;
+  /** From a history-search hit: scroll to and briefly highlight this message. */
+  focusMessageId?: string | null;
+  /** The search term behind that hit — scrolled to and highlighted within the message. */
+  focusQuery?: string | null;
+}) {
   const messages = useStore((s) => s.messages);
   const hasMoreMessages = useStore((s) => s.hasMoreMessages);
   const prependMessages = useStore((s) => s.prependMessages);
@@ -24,7 +50,6 @@ export function Chat({ sessionId }: { sessionId: string }) {
   const runState = useStore((s) => s.runState);
   const session = useStore((s) => s.session);
   const completed = session?.status === 'completed';
-  const [confirmDone, setConfirmDone] = useState(false);
   const [loadingEarlier, setLoadingEarlier] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const running = runState === 'running';
@@ -96,6 +121,65 @@ export function Chat({ sessionId }: { sessionId: string }) {
     }
   };
 
+  // Search-hit jump: once the initial page has landed, page back until the
+  // target message is loaded, then center it and flash a highlight.
+  const [jumpMissing, setJumpMissing] = useState(false);
+  const jumpedRef = useRef<string | null>(null);
+  const loadedSessionId = useStore((s) => s.sessionId);
+  useEffect(() => {
+    if (!focusMessageId || jumpedRef.current === focusMessageId || messages.length === 0) return;
+    // Next.js can reuse this component across sessions; wait until the store
+    // actually holds this session's messages before paging through them.
+    if (loadedSessionId !== sessionId) return;
+    jumpedRef.current = focusMessageId;
+    let cancelled = false;
+    // Don't let the auto-follow snap back to the bottom as older pages land.
+    nearBottomRef.current = false;
+    (async () => {
+      let st = useStore.getState();
+      for (let page = 0; page < MAX_JUMP_PAGES; page++) {
+        if (st.messages.some((m) => m.id === focusMessageId) || !st.hasMoreMessages) break;
+        const res = await api.earlierMessages(sessionId, st.messages[0]!.id).catch(() => null);
+        if (cancelled || !res) return;
+        st.prependMessages(res.messages, res.hasMore);
+        st = useStore.getState();
+      }
+      if (cancelled) return;
+      // Let React paint the prepended pages before looking for the element.
+      requestAnimationFrame(() => {
+        const el = scrollRef.current?.querySelector<HTMLElement>(
+          `[data-msg-id="${CSS.escape(focusMessageId)}"]`,
+        );
+        if (!el) {
+          setJumpMissing(true);
+          return;
+        }
+        nearBottomRef.current = false;
+        el.classList.add('msg-flash');
+        setTimeout(() => el.classList.remove('msg-flash'), 2400);
+        // Long replies can be several screens tall — land on the matched words
+        // themselves, not the middle of the bubble.
+        const range = focusQuery ? findTextRange(el, focusQuery) : null;
+        const box = scrollRef.current;
+        if (range && box) {
+          const r = range.getBoundingClientRect();
+          const b = box.getBoundingClientRect();
+          box.scrollTop += r.top - b.top - box.clientHeight / 2;
+          // CSS Custom Highlight API: marks the words without touching React's DOM.
+          const hl = (globalThis as { Highlight?: new (...r: Range[]) => unknown }).Highlight;
+          const reg = (CSS as unknown as { highlights?: Map<string, unknown> }).highlights;
+          if (hl && reg) reg.set('search-hit', new hl(range));
+        } else {
+          el.scrollIntoView({ block: el.offsetHeight > (box?.clientHeight ?? 0) ? 'start' : 'center' });
+        }
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusMessageId, messages.length > 0, sessionId, loadedSessionId]);
+
   const onScroll = () => {
     updateNearBottom();
     // Guard with didInitialScrollRef too: don't treat the initial landing (or
@@ -109,67 +193,35 @@ export function Chat({ sessionId }: { sessionId: string }) {
     }
   };
 
-  const markDone = () => {
-    getSocket().send({ type: 'mark.completed', sessionId });
-    setConfirmDone(false);
-  };
+  // One column width for the transcript and the composer, so their edges line up.
+  const column = 'mx-auto w-full max-w-3xl 2xl:max-w-4xl';
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] min-w-0 flex-1 flex-col">
+    <div className="flex h-[calc(100dvh-3.5rem)] min-w-0 flex-1 flex-col">
       <RunConfigBar sessionId={sessionId} />
-      <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto px-4 py-6">
-        <div className="mx-auto max-w-3xl">
+      <div
+        ref={scrollRef}
+        onScroll={onScroll}
+        className="scroll-area min-h-0 flex-1 overflow-x-hidden px-3 py-5 [scrollbar-gutter:stable_both-edges] sm:px-4 sm:py-6"
+      >
+        <div className={column}>
+          {jumpMissing && (
+            <div className="pb-3 text-center text-xs text-muted">没找到搜索结果对应的那条消息，可能已被删除</div>
+          )}
           {hasMoreMessages && (
             <div className="pb-3 text-center text-xs text-muted">
-              {loadingEarlier ? '加载更早的消息…' : '↑ 上滑加载更早的消息'}
+              {loadingEarlier ? '正在加载更早的消息…' : '上滑加载更早的消息'}
             </div>
           )}
           <MessageList messages={messages} streaming={streaming} running={running} />
         </div>
       </div>
-      <div className="border-t border-border bg-bg/70 px-4 py-3">
-        <div className="mx-auto max-w-3xl space-y-3">
+      <div className="pb-safe shrink-0 border-t border-border bg-bg px-3 pt-3 sm:px-4">
+        <div className={`${column} space-y-3`}>
           <QuestionDock sessionId={sessionId} />
-          {/* completion button sits to the RIGHT, aligned to the composer's bottom */}
-          <div className="flex items-end gap-2">
-            <div className="flex-1">
-              <Composer sessionId={sessionId} disabled={completed} />
-            </div>
-            {completed ? (
-              <div className="flex shrink-0 items-center gap-1.5 rounded-xl border border-success/40 bg-success/10 px-3 py-2.5 text-xs font-medium text-success">
-                <CheckCircle2 size={15} /> 已完成并归档
-              </div>
-            ) : (
-              <button
-                onClick={() => setConfirmDone(true)}
-                title="将此任务标记为出色完成：平台会学习并归档，之后该对话变为只读"
-                className="flex shrink-0 items-center gap-1.5 rounded-xl bg-success/90 px-3 py-2.5 text-xs font-medium text-white transition hover:bg-success"
-              >
-                <CheckCircle2 size={15} /> 归档
-              </button>
-            )}
-          </div>
+          <Composer sessionId={sessionId} disabled={completed} />
         </div>
       </div>
-
-      <Modal
-        open={confirmDone}
-        onClose={() => setConfirmDone(false)}
-        title="标记为出色完成？"
-        className="max-w-sm"
-      >
-        <p className="text-sm text-muted">
-          平台会学习并归档本次任务的成果与方案以便复现，<b className="text-text">该对话随后将变为只读</b>，无法继续对话。确定吗？
-        </p>
-        <div className="mt-4 flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => setConfirmDone(false)}>
-            取消
-          </Button>
-          <Button variant="success" onClick={markDone}>
-            确认完成并归档
-          </Button>
-        </div>
-      </Modal>
     </div>
   );
 }

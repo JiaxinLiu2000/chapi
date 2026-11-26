@@ -147,7 +147,8 @@ describe('SdkOrchestrator.handleUserMessage — stale account-pin race guard', (
     await orchestrator.handleUserMessage(sessionId, 'hello');
 
     expect(stopCalls).toBe(0);
-    expect(pushed).toBe('hello');
+    // The user's text goes first; knowledge-graph recall may be appended after it.
+    expect((pushed ?? '').split('\n\n')[0]).toBe('hello');
     expect(runs.get(sessionId)).toBe(matchingRun);
   });
 });

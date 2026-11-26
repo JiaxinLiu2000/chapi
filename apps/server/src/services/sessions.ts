@@ -3,15 +3,21 @@ import path from 'node:path';
 import type {
   CreateSessionInput,
   PermissionProfile,
+  RunState,
   SessionDetailResponse,
   SessionDTO,
+  SessionSearchResponse,
 } from '@chapi/shared';
 import { config, sessionPaths } from '../config.js';
 import { prisma } from '../db/client.js';
 import { bus } from '../gateway/bus.js';
+import { listSessionRuns } from '../workflow/store.js';
+import { HITL_MESSAGE_TYPES } from '../engine/hitlTranscript.js';
+import { hitl } from '../engine/hitl.js';
 import { createLogger } from '../logger.js';
 import {
   toAgentRunDTO,
+  toApprovalDTO,
   toArtifactDTO,
   toAttachmentDTO,
   toMessageDTO,
@@ -22,6 +28,7 @@ import {
 import { settings } from '../secrets.js';
 import { getOrchestrator } from '../orchestrator/types.js';
 import { ensureSandboxHelpers } from './workspaces.js';
+import { generateSessionTitle, setTitleKeepingOrder } from '../learning/title.js';
 import { deriveTitle, makeSessionSlug } from '../util/ids.js';
 
 const log = createLogger('sessions');
@@ -70,6 +77,8 @@ export async function createSession(input: CreateSessionInput): Promise<SessionD
     data: {
       slug,
       title,
+      // An explicit title is the caller's own; otherwise it's a placeholder until the AI titles it.
+      titleSource: input.title ? 'user' : 'auto',
       model: input.model ?? models.main,
       subagentModel: input.subagentModel ?? models.subagent,
       permissionProfile: profile,
@@ -81,6 +90,7 @@ export async function createSession(input: CreateSessionInput): Promise<SessionD
       ...(input.qualityReviewMinutes !== undefined
         ? { qualityReviewMinutes: input.qualityReviewMinutes }
         : {}),
+      ...(input.qualityModel ? { qualityModel: input.qualityModel } : {}),
     },
   });
 
@@ -109,13 +119,24 @@ export async function getSessionBySlug(slug: string): Promise<SessionDTO | null>
 // loads up front — older ones page in on demand via getEarlierMessages().
 const MESSAGE_PAGE_SIZE = 200;
 
+/**
+ * The session's live run state for a client that is (re)loading. A run that was
+ * torn down without emitting 'idle' (stop/delete) has no Run any more, so it
+ * can't still be 'running'/'paused'.
+ */
+export function currentRunState(sessionId: string): RunState {
+  const st = bus.lastRunState(sessionId);
+  if ((st === 'running' || st === 'paused') && !getOrchestrator().isActive(sessionId)) return 'idle';
+  return st;
+}
+
 export async function getSessionDetail(
   id: string,
 ): Promise<SessionDetailResponse | null> {
   const session = await prisma.session.findUnique({ where: { id } });
   if (!session) return null;
   await reconcileAgents(id);
-  const [messageCount, recentMessagesDesc, plan, agents, artifacts, attachments, openQuestions] =
+  const [messageCount, recentMessagesDesc, plan, agents, artifacts, attachments, openQuestions, openApprovals] =
     await Promise.all([
       prisma.message.count({ where: { sessionId: id } }),
       prisma.message.findMany({
@@ -128,8 +149,10 @@ export async function getSessionDetail(
       prisma.artifact.findMany({ where: { sessionId: id }, orderBy: { createdAt: 'asc' } }),
       prisma.attachment.findMany({ where: { sessionId: id }, orderBy: { createdAt: 'asc' } }),
       prisma.pendingQuestion.findMany({ where: { sessionId: id, status: 'open' } }),
+      prisma.approval.findMany({ where: { sessionId: id, status: 'open' }, orderBy: { createdAt: 'asc' } }),
     ]);
   const messages = recentMessagesDesc.slice().reverse();
+  const workflowRuns = await listSessionRuns(id).catch(() => []);
   return {
     session: toSessionDTO(session),
     messages: messages.map(toMessageDTO),
@@ -139,6 +162,11 @@ export async function getSessionDetail(
     artifacts: artifacts.map(toArtifactDTO),
     attachments: attachments.map(toAttachmentDTO),
     openQuestions: openQuestions.map(toPendingQuestionDTO),
+    // Only approvals a live run is actually waiting on — rows left 'open' by a
+    // run that died (e.g. server restart) can't be answered, so don't show them.
+    openApprovals: openApprovals.filter((a) => hitl.hasApproval(a.id)).map(toApprovalDTO),
+    workflowRuns,
+    runState: currentRunState(id),
   };
 }
 
@@ -209,4 +237,95 @@ export async function setSessionStatus(
   const dto = toSessionDTO(s);
   bus.emit({ type: 'session.updated', session: dto });
   return dto;
+}
+
+/**
+ * Rename a session. A non-empty title is the user's own and the AI will never
+ * overwrite it; an empty one hands the title back to the AI, which regenerates
+ * it from the conversation. Keeps the session's place in the history list.
+ */
+export async function renameSession(id: string, rawTitle: string): Promise<SessionDTO | null> {
+  const existing = await prisma.session.findUnique({ where: { id } });
+  if (!existing) return null;
+  const title = rawTitle.replace(/\s+/g, ' ').trim();
+  if (title) {
+    await setTitleKeepingOrder(id, title, 'user');
+  } else {
+    // Keep showing the current title until the regenerated one lands (pushed via session.updated).
+    await setTitleKeepingOrder(id, existing.title, 'auto');
+    void generateSessionTitle(id);
+  }
+  const s = await prisma.session.findUnique({ where: { id } });
+  if (!s) return null;
+  const dto = toSessionDTO(s);
+  bus.emit({ type: 'session.updated', session: dto });
+  return dto;
+}
+
+const SEARCH_SCAN_LIMIT = 600;
+const MATCHES_PER_SESSION = 3;
+const SNIPPET_CHARS = 120;
+
+/** Message text as plain prose for a one-line preview: no Markdown emphasis, headings, code ticks or link URLs. */
+function plainText(text: string): string {
+  return text
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/(\*\*|__|`+|~~)/g, '')
+    .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+\.)\s+/gm, '')
+    .replace(/\|/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** ~SNIPPET_CHARS of `text` around the first case-insensitive hit of `q`, on one line. */
+function snippetAround(text: string, q: string): string {
+  const flat = plainText(text);
+  const at = flat.toLowerCase().indexOf(q.toLowerCase());
+  if (at < 0) return flat.slice(0, SNIPPET_CHARS);
+  const lead = Math.floor((SNIPPET_CHARS - q.length) / 3);
+  const start = Math.max(0, at - lead);
+  const end = Math.min(flat.length, start + SNIPPET_CHARS);
+  return `${start > 0 ? '…' : ''}${flat.slice(start, end)}${end < flat.length ? '…' : ''}`;
+}
+
+/**
+ * Full-text search over what was actually said in each conversation (user turns
+ * and the AI's visible replies, plus approval/question round-trips — not
+ * thinking, tool calls or quality reviews).
+ * Plain LIKE on the utf8mb4_unicode_ci column: case-insensitive and works for
+ * Chinese without a tokenizer; fast enough at tens of thousands of messages.
+ */
+export async function searchSessions(rawQuery: string): Promise<SessionSearchResponse> {
+  const q = rawQuery.trim();
+  if (!q) return { results: [] };
+  const where = {
+    role: { in: ['user', 'assistant'] },
+    type: { in: ['user', 'assistant', ...HITL_MESSAGE_TYPES] },
+    text: { contains: q },
+    session: { status: { not: 'deleted' } },
+  };
+  const [counts, rows] = await Promise.all([
+    prisma.message.groupBy({ by: ['sessionId'], where, _count: { _all: true } }),
+    prisma.message.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: SEARCH_SCAN_LIMIT,
+      select: { id: true, sessionId: true, role: true, text: true, createdAt: true },
+    }),
+  ]);
+  const bySession = new Map<string, SessionSearchResponse['results'][number]>();
+  for (const c of counts) {
+    bySession.set(c.sessionId, { sessionId: c.sessionId, matchCount: c._count._all, matches: [] });
+  }
+  for (const r of rows) {
+    const entry = bySession.get(r.sessionId);
+    if (!entry || entry.matches.length >= MATCHES_PER_SESSION) continue;
+    entry.matches.push({
+      messageId: r.id,
+      role: r.role as 'user' | 'assistant',
+      snippet: snippetAround(r.text, q),
+      createdAt: r.createdAt.toISOString(),
+    });
+  }
+  return { results: [...bySession.values()] };
 }

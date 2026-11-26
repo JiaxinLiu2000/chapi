@@ -4,6 +4,8 @@ import { config } from '../../config.js';
 import { settings } from '../../secrets.js';
 import { supervisor } from '../../supervisor.js';
 import { cloakserveReachable } from '../../engine/browserView.js';
+import { isUserChromeEnabled } from '../../services/userChrome.js';
+import { userChromeRelayStatus } from '../../services/userChromeRelay.js';
 
 export async function browserRoutes(app: FastifyInstance): Promise<void> {
   app.get('/browser/status', async (): Promise<BrowserStatusResponse> => {
@@ -39,6 +41,13 @@ export async function browserRoutes(app: FastifyInstance): Promise<void> {
       logs: supervisor.getLogs(),
     };
   });
+
+  // Checked live by chapi_browser.py before it touches the user's own Chrome.
+  // `relay`: whether the 1h approved connection to Chrome is currently open.
+  app.get<{ Params: { sessionId: string } }>('/user-chrome/:sessionId', async (req) => ({
+    relay: userChromeRelayStatus(),
+    enabled: isUserChromeEnabled(req.params.sessionId),
+  }));
 
   app.post('/browser/login', async (): Promise<BrowserLoginResponse> => {
     const r = await supervisor.openLoginPage('https://accounts.google.com');
