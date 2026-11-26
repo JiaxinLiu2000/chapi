@@ -112,7 +112,7 @@ export function looksLikeWorkflowConfirm(toolName: string, input: Record<string,
  * than GET) or write the Automation / AutomationRun / Project tables directly.
  * Reads stay allowed.
  */
-const BOARD_URL_RE = /\/api\/board\/|\/api\/sessions\/[^\s"'`/]+\/project\b/i;
+const BOARD_URL_RE = /\/api\/(?:board|discord|wechat)\/|\/api\/sessions\/[^\s"'`/]+\/(?:project|discord|wechat)\b/i;
 /** Case-insensitive word inside an otherwise case-sensitive regex source. */
 const ci = (w: string) => w.replace(/[a-z]/gi, (c) => `[${c.toLowerCase()}${c.toUpperCase()}]`);
 const METHOD = `(?:${['POST', 'PUT', 'PATCH', 'DELETE'].map(ci).join('|')})\\b`;
@@ -251,7 +251,7 @@ export function buildCanUseTool(
         message:
           '自动化面板（定时任务、运行记录、项目归类）不能用命令行、脚本或直接改数据库来改。' +
           '请用 automation_list / automation_upsert / automation_link_history / automation_set_mode / automation_delete / automation_run_now 这些工具；' +
-          '切到自动、删除、立即运行会在对话里请用户确认。项目归类请让用户在 /board 页面上操作。读取不受限制。',
+          '切到自动、删除、立即运行会在对话里请用户确认。项目归类、手机远程（Discord/微信）的设置和连接请让用户在 chapi 页面上操作。读取不受限制。',
       };
     }
 
